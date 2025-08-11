@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { useAppStore } from "@/store/useAppStore";
 import SEO from "@/components/SEO";
+import QuickActionsWidget from "@/components/QuickActionsWidget";
 import { format } from "date-fns";
 
 const currency = (n: number) => `₹${n.toLocaleString("en-IN")}`;
@@ -75,15 +76,7 @@ const Index = () => {
         </Card>
 
         <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              <Button onClick={() => navigate("/invoices/new")}>Create Invoice</Button>
-              <Button variant="secondary" onClick={() => navigate("/tasks")}>Add Task</Button>
-            </CardContent>
-          </Card>
+          <QuickActionsWidget />
 
           <Card>
             <CardHeader>

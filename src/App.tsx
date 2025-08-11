@@ -7,7 +7,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AppLayout from "@/components/layout/AppLayout";
 import InvoicesList from "@/pages/invoices/InvoicesList";
-import NewInvoice from "@/pages/invoices/NewInvoice";
+import CreateInvoice from "@/pages/invoices/CreateInvoice";
 import Tasks from "@/pages/Tasks";
 import Clients from "@/pages/Clients";
 import FollowUps from "@/pages/FollowUps";
@@ -32,7 +32,7 @@ const App = () => (
           <Route path="/" element={<LayoutRoute />}> 
             <Route index element={<Index />} />
             <Route path="invoices" element={<InvoicesList />} />
-            <Route path="invoices/new" element={<NewInvoice />} />
+            <Route path="invoices/new" element={<CreateInvoice />} />
             <Route path="tasks" element={<Tasks />} />
             <Route path="clients" element={<Clients />} />
             <Route path="follow-ups" element={<FollowUps />} />
