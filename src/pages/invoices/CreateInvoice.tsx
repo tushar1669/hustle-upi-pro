@@ -238,7 +238,7 @@ export default function CreateInvoice() {
         create_reminder({
           invoice_id: invoice.id,
           scheduled_at: reminder7Days.toISOString(),
-          channel: "whatsapp",
+          channel: "whatsapp", 
           status: "pending"
         }),
         create_reminder({
@@ -258,6 +258,9 @@ export default function CreateInvoice() {
       });
 
       queryClient.invalidateQueries({ queryKey: ["invoices_all"] });
+      queryClient.invalidateQueries({ queryKey: ["reminders"] });
+      queryClient.invalidateQueries({ queryKey: ["message_log_recent"] });
+      queryClient.invalidateQueries({ queryKey: ["v_dashboard_metrics"] });
       toast({ title: "Invoice sent successfully" });
       navigate("/invoices");
     } catch (error) {
