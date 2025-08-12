@@ -8,11 +8,25 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { useAppStore } from "@/store/useAppStore";
 import { QRCodeSVG } from "qrcode.react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Plus, Trash2, FileText, Send } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { 
+  settings_one, 
+  clients_all, 
+  projects_all, 
+  invoices_all,
+  create_invoice, 
+  create_item, 
+  create_message_log,
+  create_reminder,
+  update_invoice
+} from "@/data/collections";
+import { useToast } from "@/hooks/use-toast";
+import AddClientModal from "@/components/AddClientModal";
+import AddProjectModal from "@/components/AddProjectModal";
 
 const currency = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
@@ -26,10 +40,13 @@ interface LineItem {
 
 export default function CreateInvoice() {
   const navigate = useNavigate();
-  const settings = useAppStore((s) => s.settings);
-  const clients = useAppStore((s) => s.clients);
-  const projects = useAppStore((s) => s.projects);
-  const addInvoiceDraft = useAppStore((s) => s.addInvoiceDraft);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: settings } = useQuery({ queryKey: ["settings_one"], queryFn: settings_one });
+  const { data: clients = [], refetch: refetchClients } = useQuery({ queryKey: ["clients_all"], queryFn: clients_all });
+  const { data: projects = [], refetch: refetchProjects } = useQuery({ queryKey: ["projects_all"], queryFn: projects_all });
+  const { data: invoices = [] } = useQuery({ queryKey: ["invoices_all"], queryFn: invoices_all });
 
   const [clientId, setClientId] = useState("");
   const [projectId, setProjectId] = useState("");
@@ -40,27 +57,43 @@ export default function CreateInvoice() {
     date.setDate(date.getDate() + 7);
     return date.toISOString().split('T')[0];
   });
+  const [showClientModal, setShowClientModal] = useState(false);
+  const [showProjectModal, setShowProjectModal] = useState(false);
 
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { id: "1", title: "Website Development", qty: 1, rate: 25000, amount: 25000 }
   ]);
 
-  const selectedClient = clients.find(c => c.id === clientId);
-  const filteredProjects = projects.filter(p => p.clientId === clientId);
+  const selectedClient = clients.find((c: any) => c.id === clientId);
+  const filteredProjects = projects.filter((p: any) => p.client_id === clientId);
 
   const invoiceNumber = useMemo(() => {
-    const seq = (useAppStore.getState().invoices.length + 1).toString().padStart(4, "0");
-    return `${settings.invoicePrefix}-2025-${seq}`;
-  }, [settings.invoicePrefix]);
+    if (!settings) return "";
+    const year = new Date().getFullYear();
+    const lastInvoice = invoices
+      .filter((inv: any) => inv.invoice_number?.startsWith(settings.invoice_prefix))
+      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+    
+    let nextNumber = 1;
+    if (lastInvoice?.invoice_number) {
+      const match = lastInvoice.invoice_number.match(/(\d{4})$/);
+      if (match) {
+        nextNumber = parseInt(match[1]) + 1;
+      }
+    }
+    
+    return `${settings.invoice_prefix}-${year}-${nextNumber.toString().padStart(4, "0")}`;
+  }, [settings, invoices]);
 
   const subtotal = lineItems.reduce((sum, item) => sum + item.amount, 0);
-  const gstAmount = gstEnabled ? subtotal * (settings.defaultGst / 100) : 0;
+  const gstAmount = gstEnabled && settings ? subtotal * (settings.default_gst_percent / 100) : 0;
   const totalAmount = subtotal + gstAmount;
 
+  const upiVpa = selectedClient?.upi_vpa || settings?.upi_vpa || "";
   const upiLink = useMemo(() => {
-    if (!totalAmount) return "";
-    return `upi://pay?pa=${settings.upiVpa}&pn=${encodeURIComponent(settings.displayName)}&am=${totalAmount.toFixed(0)}&tn=INV%20${invoiceNumber}`;
-  }, [totalAmount, invoiceNumber, settings.displayName, settings.upiVpa]);
+    if (!totalAmount || !upiVpa || !settings) return "";
+    return `upi://pay?pa=${upiVpa}&pn=${encodeURIComponent(settings.creator_display_name)}&am=${totalAmount.toFixed(0)}&tn=INV%20${invoiceNumber}`;
+  }, [totalAmount, invoiceNumber, settings, upiVpa]);
 
   const updateLineItem = (id: string, field: keyof LineItem, value: string | number) => {
     setLineItems(items => items.map(item => {
@@ -90,38 +123,151 @@ export default function CreateInvoice() {
     setLineItems(items => items.filter(item => item.id !== id));
   };
 
-  const saveDraft = () => {
+  const handleClientSelect = (newClientId: string) => {
+    setClientId(newClientId);
+    setProjectId(""); // Reset project when client changes
+  };
+
+  const handleClientCreated = (newClientId: string) => {
+    refetchClients();
+    setClientId(newClientId);
+    queryClient.invalidateQueries({ queryKey: ["clients_all"] });
+  };
+
+  const handleProjectCreated = (newProjectId: string) => {
+    refetchProjects();
+    setProjectId(newProjectId);
+    queryClient.invalidateQueries({ queryKey: ["projects_all"] });
+  };
+
+  const saveDraft = async () => {
     if (!clientId) {
-      alert("Please select a client");
+      toast({ title: "Please select a client", variant: "destructive" });
       return;
     }
     
-    const invoiceId = `inv-${Date.now()}`;
-    // Create line items for the invoice
-    const invoiceItems = lineItems.map(item => ({
-      id: `item-${item.id}`,
-      invoiceId,
-      title: item.title,
-      qty: item.qty,
-      rate: item.rate,
-      amount: item.amount
-    }));
+    try {
+      const invoiceData = {
+        invoice_number: invoiceNumber,
+        client_id: clientId,
+        project_id: projectId || null,
+        issue_date: new Date().toISOString(),
+        due_date: new Date(dueDate).toISOString(),
+        subtotal,
+        gst_amount: gstAmount,
+        total_amount: totalAmount,
+        status: "draft" as const,
+        notes: notes || null
+      };
 
-    addInvoiceDraft({
-      invoiceNumber,
-      clientId,
-      projectId: projectId || undefined,
-      issueDate: new Date().toISOString(),
-      dueDate: new Date(dueDate).toISOString(),
-      subtotal,
-      gstAmount,
-      totalAmount,
-      status: "draft" as const,
-      notes: notes || undefined
-    }, invoiceItems);
-    
-    navigate("/invoices");
+      const invoice = await create_invoice(invoiceData);
+      
+      // Create line items
+      for (const item of lineItems) {
+        await create_item({
+          invoice_id: invoice.id,
+          title: item.title,
+          qty: item.qty,
+          rate: item.rate,
+          amount: item.amount
+        });
+      }
+
+      await create_message_log({
+        related_type: "invoice",
+        related_id: invoice.id,
+        channel: "whatsapp",
+        template_used: "invoice_draft",
+        outcome: "saved"
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["invoices_all"] });
+      toast({ title: "Draft saved successfully" });
+      navigate("/invoices");
+    } catch (error) {
+      toast({ title: "Error saving draft", variant: "destructive" });
+    }
   };
+
+  const sendInvoice = async () => {
+    if (!clientId) {
+      toast({ title: "Please select a client", variant: "destructive" });
+      return;
+    }
+    
+    try {
+      const invoiceData = {
+        invoice_number: invoiceNumber,
+        client_id: clientId,
+        project_id: projectId || null,
+        issue_date: new Date().toISOString(),
+        due_date: new Date(dueDate).toISOString(),
+        subtotal,
+        gst_amount: gstAmount,
+        total_amount: totalAmount,
+        status: "sent" as const,
+        notes: notes || null
+      };
+
+      const invoice = await create_invoice(invoiceData);
+      
+      // Create line items
+      for (const item of lineItems) {
+        await create_item({
+          invoice_id: invoice.id,
+          title: item.title,
+          qty: item.qty,
+          rate: item.rate,
+          amount: item.amount
+        });
+      }
+
+      // Create reminders
+      const now = new Date();
+      const reminder3Days = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+      const reminder7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const reminder14Days = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+
+      await Promise.all([
+        create_reminder({
+          invoice_id: invoice.id,
+          scheduled_at: reminder3Days.toISOString(),
+          channel: "whatsapp",
+          status: "pending"
+        }),
+        create_reminder({
+          invoice_id: invoice.id,
+          scheduled_at: reminder7Days.toISOString(),
+          channel: "whatsapp",
+          status: "pending"
+        }),
+        create_reminder({
+          invoice_id: invoice.id,
+          scheduled_at: reminder14Days.toISOString(),
+          channel: "whatsapp",
+          status: "pending"
+        })
+      ]);
+
+      await create_message_log({
+        related_type: "invoice",
+        related_id: invoice.id,
+        channel: "whatsapp",
+        template_used: "invoice_sent",
+        outcome: "queued"
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["invoices_all"] });
+      toast({ title: "Invoice sent successfully" });
+      navigate("/invoices");
+    } catch (error) {
+      toast({ title: "Error sending invoice", variant: "destructive" });
+    }
+  };
+
+  if (!settings) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -135,7 +281,7 @@ export default function CreateInvoice() {
             <FileText className="h-4 w-4 mr-2" />
             Save Draft
           </Button>
-          <Button onClick={saveDraft}>
+          <Button onClick={sendInvoice}>
             <Send className="h-4 w-4 mr-2" />
             Save & Send
           </Button>
@@ -153,35 +299,45 @@ export default function CreateInvoice() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="client">Client *</Label>
-                <Select value={clientId} onValueChange={setClientId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a client" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2">
+                  <Select value={clientId} onValueChange={handleClientSelect}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Select a client" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map((client: any) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button variant="outline" onClick={() => setShowClientModal(true)}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
 
               {clientId && (
                 <div className="space-y-2">
                   <Label htmlFor="project">Project (Optional)</Label>
-                  <Select value={projectId} onValueChange={setProjectId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a project" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {filteredProjects.map((project) => (
-                        <SelectItem key={project.id} value={project.id}>
-                          {project.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2">
+                    <Select value={projectId} onValueChange={setProjectId}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Select a project" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filteredProjects.map((project: any) => (
+                          <SelectItem key={project.id} value={project.id}>
+                            {project.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button variant="outline" onClick={() => setShowProjectModal(true)}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -264,7 +420,7 @@ export default function CreateInvoice() {
                   checked={gstEnabled}
                   onCheckedChange={setGstEnabled}
                 />
-                <Label>Include GST ({settings.defaultGst}%)</Label>
+                <Label>Include GST ({settings.default_gst_percent}%)</Label>
               </div>
 
               <div className="space-y-2">
@@ -291,7 +447,7 @@ export default function CreateInvoice() {
                 <div className="flex justify-between items-start">
                   <div>
                     <h2 className="text-xl font-bold text-primary">HustleHub</h2>
-                    <p className="text-sm text-muted-foreground">{settings.displayName}</p>
+                    <p className="text-sm text-muted-foreground">{settings.creator_display_name}</p>
                   </div>
                   <div className="text-right">
                     <h3 className="text-lg font-semibold">INVOICE</h3>
@@ -339,7 +495,7 @@ export default function CreateInvoice() {
                 </div>
                 {gstEnabled && (
                   <div className="flex justify-between text-sm">
-                    <span>GST ({settings.defaultGst}%):</span>
+                    <span>GST ({settings.default_gst_percent}%):</span>
                     <span>{currency(gstAmount)}</span>
                   </div>
                 )}
@@ -359,7 +515,7 @@ export default function CreateInvoice() {
           </Card>
 
           {/* UPI Payment */}
-          {totalAmount > 0 && (
+          {totalAmount > 0 && upiVpa && (
             <Card>
               <CardHeader>
                 <CardTitle>UPI Payment</CardTitle>
@@ -371,11 +527,11 @@ export default function CreateInvoice() {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>Pay To:</span>
-                    <span className="font-medium">{settings.displayName}</span>
+                    <span className="font-medium">{settings.creator_display_name}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>UPI ID:</span>
-                    <span className="font-medium">{settings.upiVpa}</span>
+                    <span className="font-medium">{upiVpa}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Amount:</span>
@@ -390,6 +546,21 @@ export default function CreateInvoice() {
           )}
         </div>
       </div>
+
+      <AddClientModal 
+        isOpen={showClientModal} 
+        onClose={() => setShowClientModal(false)} 
+        onSuccess={handleClientCreated} 
+      />
+
+      {clientId && (
+        <AddProjectModal 
+          isOpen={showProjectModal} 
+          onClose={() => setShowProjectModal(false)} 
+          clientId={clientId}
+          onSuccess={handleProjectCreated} 
+        />
+      )}
     </div>
   );
 }

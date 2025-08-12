@@ -29,6 +29,13 @@ const Index = () => {
   const handleMarkDone = async (taskId: string) => {
     await update_task(taskId, { status: "done" });
     await Promise.all([refetchTasks()]);
+    await (await import("@/data/collections")).create_message_log({
+      related_type: "task",
+      related_id: taskId,
+      channel: "whatsapp",
+      template_used: "task_completed",
+      outcome: "completed"
+    });
   };
 
   return (

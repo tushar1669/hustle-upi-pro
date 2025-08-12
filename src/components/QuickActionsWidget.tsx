@@ -38,6 +38,14 @@ export default function QuickActionsWidget() {
             <CheckSquare className="h-4 w-4 mr-2" />
             Add Task
           </Button>
+          <Button variant="outline" onClick={() => navigate("/clients")} className="h-12">
+            <Users className="h-4 w-4 mr-2" />
+            Add Client
+          </Button>
+          <Button variant="outline" onClick={() => navigate("/follow-ups")} className="h-12">
+            <Plus className="h-4 w-4 mr-2" />
+            Create Follow-up
+          </Button>
         </div>
 
         {/* Quick Lists */}

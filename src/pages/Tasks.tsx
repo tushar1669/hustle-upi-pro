@@ -5,16 +5,17 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { useAppStore } from "@/store/useAppStore";
 import { useState } from "react";
 import { Plus, List, LayoutGrid, Filter, Search } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { tasks_all, projects_all, clients_all, update_task, create_message_log } from "@/data/collections";
+import { useToast } from "@/hooks/use-toast";
+import AddTaskModal from "@/components/AddTaskModal";
+import { useNavigate } from "react-router-dom";
 
-const TaskCard = ({ task, onMarkDone }: { task: any; onMarkDone: (id: string) => void }) => {
-  const clients = useAppStore((s) => s.clients);
-  const projects = useAppStore((s) => s.projects);
-  
-  const project = projects.find(p => p.id === task.projectId);
-  const client = clients.find(c => c.id === project?.clientId);
+const TaskCard = ({ task, onMarkDone, projects, clients }: { task: any; onMarkDone: (id: string) => void; projects: any[]; clients: any[] }) => {
+  const project = projects.find((p: any) => p.id === task.project_id);
+  const client = clients.find((c: any) => c.id === project?.client_id);
   
   return (
     <Card className="cursor-pointer hover:shadow-md transition-shadow">
@@ -22,8 +23,8 @@ const TaskCard = ({ task, onMarkDone }: { task: any; onMarkDone: (id: string) =>
         <div className="space-y-2">
           <div className="flex items-start justify-between">
             <h4 className="font-medium">{task.title}</h4>
-            <Badge variant={task.isBillable ? "default" : "secondary"}>
-              {task.isBillable ? "₹ Billable" : "Free"}
+            <Badge variant={task.is_billable ? "default" : "secondary"}>
+              {task.is_billable ? "₹ Billable" : "Free"}
             </Badge>
           </div>
           
@@ -35,10 +36,10 @@ const TaskCard = ({ task, onMarkDone }: { task: any; onMarkDone: (id: string) =>
             <p className="text-xs text-muted-foreground">{client.name}</p>
           )}
           
-          {task.dueDate && (
+          {task.due_date && (
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">
-                Due: {new Date(task.dueDate).toLocaleDateString()}
+                Due: {new Date(task.due_date).toLocaleDateString()}
               </span>
               {task.status === "open" && (
                 <Button size="sm" variant="outline" onClick={() => onMarkDone(task.id)}>
@@ -54,48 +55,69 @@ const TaskCard = ({ task, onMarkDone }: { task: any; onMarkDone: (id: string) =>
 };
 
 export default function Tasks() {
-  const tasks = useAppStore((s) => s.tasks);
-  const projects = useAppStore((s) => s.projects);
-  const clients = useAppStore((s) => s.clients);
-  const toggleTaskDone = useAppStore((s) => s.toggleTaskDone);
+  const { data: tasks = [], refetch: refetchTasks } = useQuery({ queryKey: ["tasks_all"], queryFn: tasks_all });
+  const { data: projects = [] } = useQuery({ queryKey: ["projects_all"], queryFn: projects_all });
+  const { data: clients = [] } = useQuery({ queryKey: ["clients_all"], queryFn: clients_all });
   
   const [view, setView] = useState<"list" | "kanban">("list");
   const [statusFilter, setStatusFilter] = useState("all");
   const [projectFilter, setProjectFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
-  const filteredTasks = tasks.filter(task => {
+  const filteredTasks = tasks.filter((task: any) => {
     if (statusFilter !== "all" && task.status !== statusFilter) return false;
-    if (projectFilter !== "all" && task.projectId !== projectFilter) return false;
+    if (projectFilter !== "all" && task.project_id !== projectFilter) return false;
     if (searchQuery && !task.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
   });
 
+  const handleMarkDone = async (taskId: string) => {
+    try {
+      await update_task(taskId, { status: "done" });
+      await create_message_log({
+        related_type: "task",
+        related_id: taskId,
+        channel: "whatsapp",
+        template_used: "task_completed",
+        outcome: "completed"
+      });
+      await refetchTasks();
+      queryClient.invalidateQueries({ queryKey: ["tasks_all"] });
+      toast({ title: "Task marked as done" });
+    } catch (error) {
+      toast({ title: "Error updating task", variant: "destructive" });
+    }
+  };
+
   const kanbanColumns = {
-    today: filteredTasks.filter(t => t.dueDate && new Date(t.dueDate).toDateString() === new Date().toDateString()),
-    thisWeek: filteredTasks.filter(t => {
-      if (!t.dueDate) return false;
-      const taskDate = new Date(t.dueDate);
+    today: filteredTasks.filter((t: any) => t.due_date && new Date(t.due_date).toDateString() === new Date().toDateString()),
+    thisWeek: filteredTasks.filter((t: any) => {
+      if (!t.due_date) return false;
+      const taskDate = new Date(t.due_date);
       const today = new Date();
       const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
       return taskDate > today && taskDate <= weekFromNow;
     }),
-    later: filteredTasks.filter(t => {
-      if (!t.dueDate) return true;
-      const taskDate = new Date(t.dueDate);
+    later: filteredTasks.filter((t: any) => {
+      if (!t.due_date) return true;
+      const taskDate = new Date(t.due_date);
       const weekFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       return taskDate > weekFromNow && t.status === "open";
     }),
-    done: filteredTasks.filter(t => t.status === "done")
+    done: filteredTasks.filter((t: any) => t.status === "done")
   };
 
   const getProjectName = (projectId?: string) => {
-    return projects.find(p => p.id === projectId)?.name || "-";
+    return projects.find((p: any) => p.id === projectId)?.name || "-";
   };
 
   const getClientName = (projectId?: string) => {
-    const project = projects.find(p => p.id === projectId);
-    return clients.find(c => c.id === project?.clientId)?.name || "-";
+    const project = projects.find((p: any) => p.id === projectId);
+    return clients.find((c: any) => c.id === project?.client_id)?.name || "-";
   };
 
   return (
@@ -104,7 +126,7 @@ export default function Tasks() {
       
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Tasks & Projects</h1>
-        <Button>
+        <Button onClick={() => setShowAddModal(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Add Task
         </Button>
@@ -145,7 +167,7 @@ export default function Tasks() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Projects</SelectItem>
-                  {projects.map((project) => (
+                  {projects.map((project: any) => (
                     <SelectItem key={project.id} value={project.id}>
                       {project.name}
                     </SelectItem>
@@ -195,17 +217,17 @@ export default function Tasks() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTasks.map((task) => (
+                {filteredTasks.map((task: any) => (
                   <TableRow key={task.id}>
                     <TableCell className="font-medium">{task.title}</TableCell>
-                    <TableCell>{getProjectName(task.projectId)}</TableCell>
-                    <TableCell>{getClientName(task.projectId)}</TableCell>
+                    <TableCell>{getProjectName(task.project_id)}</TableCell>
+                    <TableCell>{getClientName(task.project_id)}</TableCell>
                     <TableCell>
-                      {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "-"}
+                      {task.due_date ? new Date(task.due_date).toLocaleDateString() : "-"}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={task.isBillable ? "default" : "secondary"}>
-                        {task.isBillable ? "₹ Yes" : "No"}
+                      <Badge variant={task.is_billable ? "default" : "secondary"}>
+                        {task.is_billable ? "₹ Yes" : "No"}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -218,7 +240,7 @@ export default function Tasks() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => toggleTaskDone(task.id)}
+                          onClick={() => handleMarkDone(task.id)}
                         >
                           Mark Done
                         </Button>
@@ -242,8 +264,8 @@ export default function Tasks() {
               <Badge variant="secondary">{kanbanColumns.today.length}</Badge>
             </div>
             <div className="space-y-3">
-              {kanbanColumns.today.map((task) => (
-                <TaskCard key={task.id} task={task} onMarkDone={toggleTaskDone} />
+              {kanbanColumns.today.map((task: any) => (
+                <TaskCard key={task.id} task={task} onMarkDone={handleMarkDone} projects={projects} clients={clients} />
               ))}
             </div>
           </div>
@@ -255,8 +277,8 @@ export default function Tasks() {
               <Badge variant="secondary">{kanbanColumns.thisWeek.length}</Badge>
             </div>
             <div className="space-y-3">
-              {kanbanColumns.thisWeek.map((task) => (
-                <TaskCard key={task.id} task={task} onMarkDone={toggleTaskDone} />
+              {kanbanColumns.thisWeek.map((task: any) => (
+                <TaskCard key={task.id} task={task} onMarkDone={handleMarkDone} projects={projects} clients={clients} />
               ))}
             </div>
           </div>
@@ -268,8 +290,8 @@ export default function Tasks() {
               <Badge variant="secondary">{kanbanColumns.later.length}</Badge>
             </div>
             <div className="space-y-3">
-              {kanbanColumns.later.map((task) => (
-                <TaskCard key={task.id} task={task} onMarkDone={toggleTaskDone} />
+              {kanbanColumns.later.map((task: any) => (
+                <TaskCard key={task.id} task={task} onMarkDone={handleMarkDone} projects={projects} clients={clients} />
               ))}
             </div>
           </div>
@@ -281,13 +303,22 @@ export default function Tasks() {
               <Badge variant="secondary">{kanbanColumns.done.length}</Badge>
             </div>
             <div className="space-y-3">
-              {kanbanColumns.done.map((task) => (
-                <TaskCard key={task.id} task={task} onMarkDone={toggleTaskDone} />
+              {kanbanColumns.done.map((task: any) => (
+                <TaskCard key={task.id} task={task} onMarkDone={handleMarkDone} projects={projects} clients={clients} />
               ))}
             </div>
           </div>
         </div>
       )}
+
+      <AddTaskModal 
+        isOpen={showAddModal} 
+        onClose={() => setShowAddModal(false)} 
+        onSuccess={() => {
+          refetchTasks();
+          queryClient.invalidateQueries({ queryKey: ["tasks_all"] });
+        }} 
+      />
     </div>
   );
 }

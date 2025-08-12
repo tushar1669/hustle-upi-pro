@@ -3,16 +3,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { useAppStore } from "@/store/useAppStore";
 import { Clock, Send, MessageSquare, Mail, TrendingUp } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { invoices_all, clients_all, reminders_by_invoice, message_log_recent, update_reminder, create_message_log } from "@/data/collections";
+import { useToast } from "@/hooks/use-toast";
 
 const currency = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
 export default function FollowUps() {
-  const reminders = useAppStore((s) => s.reminders);
-  const invoices = useAppStore((s) => s.invoices);
-  const clients = useAppStore((s) => s.clients);
-  const messageLog = useAppStore((s) => s.messageLog);
+  const { data: invoices = [] } = useQuery({ queryKey: ["invoices_all"], queryFn: invoices_all });
+  const { data: clients = [] } = useQuery({ queryKey: ["clients_all"], queryFn: clients_all });
+  const { data: messageLog = [] } = useQuery({ queryKey: ["message_log_recent"], queryFn: message_log_recent });
+  const { toast } = useToast();
+
+  // Get overdue/sent invoices for follow-ups
+  const followUpInvoices = invoices.filter((inv: any) => inv.status === "sent" || inv.status === "overdue");
 
   const findInv = (id: string) => invoices.find((i) => i.id === id);
   const findClient = (invoiceId: string) => {

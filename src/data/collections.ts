@@ -23,7 +23,7 @@ export async function clients_all() {
   return data || [];
 }
 
-export async function create_client(payload: { name: string; whatsapp: string; email: string; address?: string; gstin?: string; }) {
+export async function create_client(payload: { name: string; whatsapp: string; email: string; address?: string; gstin?: string; upi_vpa?: string; }) {
   const sb = supabase();
   const { data, error } = await sb.from("clients").insert(payload).select("*").single();
   if (error) throw error;
@@ -36,6 +36,13 @@ export async function projects_all() {
   const { data, error } = await sb.from("projects").select("*");
   if (error) throw error;
   return data || [];
+}
+
+export async function create_project(payload: { client_id: string; name: string; is_billable: boolean; }) {
+  const sb = supabase();
+  const { data, error } = await sb.from("projects").insert(payload).select("*").single();
+  if (error) throw error;
+  return data;
 }
 
 // ============ Invoices ============
@@ -140,6 +147,13 @@ export async function update_task(id: string, changes: Partial<{ title: string; 
   const { data, error } = await sb.from("tasks").update(changes).eq("id", id).select("*").single();
   if (error) throw error;
   return data;
+}
+
+export async function delete_task(id: string) {
+  const sb = supabase();
+  const { error } = await sb.from("tasks").delete().eq("id", id);
+  if (error) throw error;
+  return true;
 }
 
 // ============ Reminders ============
