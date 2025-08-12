@@ -28,11 +28,13 @@ import { qaTestRunner } from '@/qa/testRunner';
 import { QA_TESTS } from '@/qa/tests';
 import type { QATestResult } from '@/qa/localStorage';
 import type { TestRunSummary } from '@/qa/testRunner';
+import { smokeTestRunner, type SmokeTestSummary } from '@/qa/smokeTests';
 
 // Import Supabase and collections for demo data
 import { supabase } from '@/integrations/supabase/client';
 import * as collections from '@/data/collections';
 import { useQueryClient } from '@tanstack/react-query';
+import { CACHE_KEYS } from '@/hooks/useCache';
 
 export default function QA() {
   const queryClient = useQueryClient();
@@ -42,6 +44,12 @@ export default function QA() {
   const [results, setResults] = useState<QATestResult[]>([]);
   const [summary, setSummary] = useState<TestRunSummary | null>(null);
   const [lastRunTime, setLastRunTime] = useState<string>('');
+  
+  // Test Runner State
+  const [isSeeding, setIsSeeding] = useState(false);
+  const [isRunningSmokeTests, setIsRunningSmokeTests] = useState(false);
+  const [smokeTestResults, setSmokeTestResults] = useState<SmokeTestSummary | null>(null);
+  const [testRunnerStatus, setTestRunnerStatus] = useState<string>('Ready');
   
   // Demo Data Management State
   const [isPopulating, setIsPopulating] = useState(false);
@@ -68,6 +76,14 @@ export default function QA() {
     
     // Load demo data counts
     loadDemoDataCounts();
+    
+    // Load smoke test results if available
+    const savedSmokeResults = localStorage.getItem('qa:smokeTestResults');
+    if (savedSmokeResults) {
+      try {
+        setSmokeTestResults(JSON.parse(savedSmokeResults));
+      } catch {}
+    }
   }, []);
 
   const loadDemoDataCounts = async () => {
@@ -226,6 +242,134 @@ export default function QA() {
     toast({
       title: 'Report Exported',
       description: 'QA test report downloaded successfully'
+    });
+  };
+
+  // Test Runner Functions
+  const handleSeedIfNeeded = async () => {
+    setIsSeeding(true);
+    setTestRunnerStatus('Checking for demo data...');
+    
+    try {
+      // Check if QA data already exists
+      const { data: qaInvoices, error } = await supabase
+        .from('invoices')
+        .select('id')
+        .like('invoice_number', 'QA-%');
+
+      if (error) throw error;
+
+      if (qaInvoices && qaInvoices.length > 0) {
+        setTestRunnerStatus('Demo data already exists');
+        toast({
+          title: 'Demo Data Already Exists',
+          description: `Found ${qaInvoices.length} QA invoices, skipping seed operation`,
+          variant: 'default'
+        });
+        return;
+      }
+
+      setTestRunnerStatus('Seeding demo data...');
+      await populateDemoData();
+      setTestRunnerStatus('Seeding completed');
+      
+      // Invalidate all caches
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: CACHE_KEYS.SETTINGS }),
+        queryClient.invalidateQueries({ queryKey: CACHE_KEYS.CLIENTS }),
+        queryClient.invalidateQueries({ queryKey: CACHE_KEYS.PROJECTS }),
+        queryClient.invalidateQueries({ queryKey: CACHE_KEYS.INVOICES }),
+        queryClient.invalidateQueries({ queryKey: ['invoice_items'] }),
+        queryClient.invalidateQueries({ queryKey: CACHE_KEYS.REMINDERS }),
+        queryClient.invalidateQueries({ queryKey: CACHE_KEYS.TASKS }),
+        queryClient.invalidateQueries({ queryKey: CACHE_KEYS.MESSAGES }),
+        queryClient.invalidateQueries({ queryKey: CACHE_KEYS.DASHBOARD })
+      ]);
+
+    } catch (error) {
+      setTestRunnerStatus('Seeding failed');
+      toast({
+        title: 'Seeding Failed',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsSeeding(false);
+      setTimeout(() => setTestRunnerStatus('Ready'), 2000);
+    }
+  };
+
+  const handleRunAllQATests = async () => {
+    setTestRunnerStatus('Running QA tests...');
+    qaTestRunner.setFixMode(false); // Force fix mode OFF for this run
+    await handleRunAllTests();
+    setTestRunnerStatus('QA tests completed');
+    setTimeout(() => setTestRunnerStatus('Ready'), 2000);
+  };
+
+  const handleRunSmokeTests = async () => {
+    setIsRunningSmokeTests(true);
+    setTestRunnerStatus('Running smoke tests...');
+    
+    try {
+      const smokeResults = await smokeTestRunner.runAllSmokeTests();
+      setSmokeTestResults(smokeResults);
+      
+      // Save to localStorage
+      localStorage.setItem('qa:smokeTestResults', JSON.stringify(smokeResults));
+      
+      toast({
+        title: 'Smoke Tests Completed',
+        description: `${smokeResults.passed}/${smokeResults.totalTests} smoke tests passed`,
+        variant: smokeResults.failed > 0 ? 'destructive' : 'default'
+      });
+      
+      setTestRunnerStatus('Smoke tests completed');
+    } catch (error) {
+      setTestRunnerStatus('Smoke tests failed');
+      toast({
+        title: 'Smoke Tests Failed',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsRunningSmokeTests(false);
+      setTimeout(() => setTestRunnerStatus('Ready'), 2000);
+    }
+  };
+
+  const handleExportFullReport = () => {
+    const qaResults = qaTestRunner.exportResults();
+    const exportData = {
+      timestamp: new Date().toISOString(),
+      qaTests: qaResults,
+      smokeTests: smokeTestResults || null,
+      summary: {
+        qaTestsPassed: results.filter(r => r.pass).length,
+        qaTestsFailed: results.filter(r => !r.pass).length,
+        qaTestsTotal: results.length,
+        smokeTestsPassed: smokeTestResults?.passed || 0,
+        smokeTestsFailed: smokeTestResults?.failed || 0,
+        smokeTestsTotal: smokeTestResults?.totalTests || 0
+      },
+      environment: {
+        userAgent: navigator.userAgent,
+        url: window.location.href,
+        timestamp: new Date().toISOString()
+      }
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `hustlehub-qa-report-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    toast({
+      title: 'Full Report Exported',
+      description: 'Complete QA and smoke test report downloaded successfully'
     });
   };
 
@@ -447,14 +591,14 @@ export default function QA() {
       }
 
       // Invalidate all React Query caches
-      await queryClient.invalidateQueries({ queryKey: ['invoices_all'] });
+      await queryClient.invalidateQueries({ queryKey: CACHE_KEYS.INVOICES });
       await queryClient.invalidateQueries({ queryKey: ['invoice_items'] });
-      await queryClient.invalidateQueries({ queryKey: ['reminders'] });
-      await queryClient.invalidateQueries({ queryKey: ['tasks_all'] });
-      await queryClient.invalidateQueries({ queryKey: ['clients_all'] });
-      await queryClient.invalidateQueries({ queryKey: ['projects_all'] });
-      await queryClient.invalidateQueries({ queryKey: ['message_log_recent'] });
-      await queryClient.invalidateQueries({ queryKey: ['v_dashboard_metrics'] });
+      await queryClient.invalidateQueries({ queryKey: CACHE_KEYS.REMINDERS });
+      await queryClient.invalidateQueries({ queryKey: CACHE_KEYS.TASKS });
+      await queryClient.invalidateQueries({ queryKey: CACHE_KEYS.CLIENTS });
+      await queryClient.invalidateQueries({ queryKey: CACHE_KEYS.PROJECTS });
+      await queryClient.invalidateQueries({ queryKey: CACHE_KEYS.MESSAGES });
+      await queryClient.invalidateQueries({ queryKey: CACHE_KEYS.DASHBOARD });
 
       await loadDemoDataCounts();
       
@@ -529,14 +673,14 @@ export default function QA() {
       deletedCounts.logs = logCount || 0;
 
       // Invalidate all React Query caches
-      await queryClient.invalidateQueries({ queryKey: ['invoices_all'] });
+      await queryClient.invalidateQueries({ queryKey: CACHE_KEYS.INVOICES });
       await queryClient.invalidateQueries({ queryKey: ['invoice_items'] });
-      await queryClient.invalidateQueries({ queryKey: ['reminders'] });
-      await queryClient.invalidateQueries({ queryKey: ['tasks_all'] });
-      await queryClient.invalidateQueries({ queryKey: ['clients_all'] });
-      await queryClient.invalidateQueries({ queryKey: ['projects_all'] });
-      await queryClient.invalidateQueries({ queryKey: ['message_log_recent'] });
-      await queryClient.invalidateQueries({ queryKey: ['v_dashboard_metrics'] });
+      await queryClient.invalidateQueries({ queryKey: CACHE_KEYS.REMINDERS });
+      await queryClient.invalidateQueries({ queryKey: CACHE_KEYS.TASKS });
+      await queryClient.invalidateQueries({ queryKey: CACHE_KEYS.CLIENTS });
+      await queryClient.invalidateQueries({ queryKey: CACHE_KEYS.PROJECTS });
+      await queryClient.invalidateQueries({ queryKey: CACHE_KEYS.MESSAGES });
+      await queryClient.invalidateQueries({ queryKey: CACHE_KEYS.DASHBOARD });
 
       await loadDemoDataCounts();
       
@@ -702,6 +846,77 @@ export default function QA() {
           </Card>
         </div>
 
+        {/* Test Runner Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Play className="h-5 w-5" />
+              Test Runner
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Automated testing suite with seeding, QA tests, smoke tests, and reporting
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <Button 
+                  onClick={handleSeedIfNeeded} 
+                  disabled={isSeeding || isRunning || isRunningSmokeTests}
+                  variant="secondary"
+                >
+                  {isSeeding ? 'Seeding...' : 'Seed If Needed'}
+                </Button>
+                
+                <Button 
+                  onClick={handleRunAllQATests} 
+                  disabled={isRunning || isSeeding || isRunningSmokeTests}
+                  className="bg-primary hover:bg-primary/90"
+                >
+                  {isRunning ? 'Running...' : 'Run All QA Tests'}
+                </Button>
+                
+                <Button 
+                  onClick={handleRunSmokeTests} 
+                  disabled={isRunningSmokeTests || isSeeding || isRunning}
+                  variant="outline"
+                >
+                  {isRunningSmokeTests ? 'Running...' : 'Run Smoke Tests'}
+                </Button>
+                
+                <Button 
+                  onClick={handleExportFullReport} 
+                  disabled={!results.length && !smokeTestResults}
+                  variant="outline"
+                >
+                  <Download className="h-4 w-4 mr-1" />
+                  Export Report
+                </Button>
+              </div>
+
+              {/* Status Line */}
+              <div className="text-sm text-muted-foreground border-t pt-4">
+                <div className="flex items-center gap-4">
+                  <span>Status: {testRunnerStatus}</span>
+                  {lastRunTime && <span>Last run: {lastRunTime}</span>}
+                  {results.length > 0 && (
+                    <>
+                      <span>Passed: {results.filter(r => r.pass).length}</span>
+                      <span>Failed: {results.filter(r => !r.pass).length}</span>
+                    </>
+                  )}
+                  {smokeTestResults && (
+                    <>
+                      <span>Smoke: {smokeTestResults.passed}/{smokeTestResults.totalTests}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Demo Data Management Panel */}
         <Card>
           <CardHeader>
@@ -763,6 +978,49 @@ export default function QA() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Smoke Tests Results */}
+        {smokeTestResults && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-primary" />
+                Smoke Test Results
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Database-level validation tests - {smokeTestResults.passed}/{smokeTestResults.totalTests} passed
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {smokeTestResults.results.map((result) => (
+                  <div
+                    key={result.id}
+                    className={`p-4 rounded-lg border ${
+                      result.pass ? 'border-success/20 bg-success/5' : 'border-destructive/20 bg-destructive/5'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      {result.pass ? (
+                        <CheckCircle className="h-4 w-4 text-success" />
+                      ) : (
+                        <AlertCircle className="h-4 w-4 text-destructive" />
+                      )}
+                      <span className="font-medium text-sm">{result.name}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-2">{result.notes}</p>
+                    <div className="text-xs text-muted-foreground">
+                      {result.executionTime}ms
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 pt-4 border-t text-xs text-muted-foreground">
+                Executed at: {new Date(smokeTestResults.executedAt).toLocaleString()}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Test Results Table */}
         <Card>

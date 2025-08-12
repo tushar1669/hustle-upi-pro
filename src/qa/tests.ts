@@ -1,6 +1,6 @@
 // QA Test Harness - Test Suite Implementation
 
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import * as collections from "@/data/collections";
 
 export interface QATest {
@@ -48,9 +48,9 @@ export const QA_TESTS: QATest[] = [
           collections.clients_all(),
           collections.projects_all(),
           collections.invoices_all(),
-          supabase().from('invoice_items').select('id'),
+          supabase.from('invoice_items').select('id'),
           collections.tasks_all(),
-          supabase().from('reminders').select('id'),
+          supabase.from('reminders').select('id'),
           collections.message_log_recent()
         ]);
 
@@ -304,7 +304,7 @@ export const QA_TESTS: QATest[] = [
     run: async () => {
       try {
         const metrics = await collections.v_dashboard_metrics();
-        const paidInvoices = await supabase()
+        const paidInvoices = await supabase
           .from('invoices')
           .select('total_amount, paid_date')
           .eq('status', 'paid')

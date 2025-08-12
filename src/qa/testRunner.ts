@@ -4,6 +4,7 @@ import { QA_TESTS, setQAFixesEnabled, type QATest } from './tests';
 import { QALocalStorage, type QATestResult, type QARunHistory } from './localStorage';
 import { codeSnapshotManager } from './codeSnapshot';
 import { create_message_log } from '@/data/collections';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface TestRunSummary {
   totalTests: number;
@@ -304,13 +305,17 @@ export class QATestRunner {
 
   private async logTestResult(result: QATestResult, templateUsed: 'qa_check' | 'qa_fix'): Promise<void> {
     try {
+      // Generate a UUID for QA test logging since related_id expects UUID
+      const qaLogId = crypto.randomUUID();
+      
       const outcome = result.pass ? 'pass' : 'fail';
       await create_message_log({
         related_type: 'qa' as any, // Type assertion since 'qa' isn't in the original type
-        related_id: result.id,
+        related_id: qaLogId, // Use generated UUID instead of test ID string
         channel: 'email' as any, // Dummy channel for QA logs
         template_used: templateUsed,
         outcome: JSON.stringify({
+          testId: result.id, // Store actual test ID in outcome
           status: outcome,
           notes: result.notes,
           fixApplied: result.fixApplied,
