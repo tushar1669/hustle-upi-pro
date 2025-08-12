@@ -29,6 +29,7 @@ import { QA_TESTS } from '@/qa/tests';
 import type { QATestResult } from '@/qa/localStorage';
 import type { TestRunSummary } from '@/qa/testRunner';
 import { smokeTestRunner, type SmokeTestSummary } from '@/qa/smokeTests';
+import { featureTestRunner, FEATURE_TESTS, type FeatureTestResult, type FeatureTestSummary } from '@/qa/featureTests';
 
 // Import Supabase and collections for demo data
 import { supabase } from '@/integrations/supabase/client';
@@ -64,6 +65,11 @@ export default function QA() {
     logs: 0
   });
 
+  // Feature Tests State
+  const [isRunningFeatureTests, setIsRunningFeatureTests] = useState(false);
+  const [featureTestResults, setFeatureTestResults] = useState<FeatureTestResult[]>([]);
+  const [featureTestSummary, setFeatureTestSummary] = useState<FeatureTestSummary | null>(null);
+
   useEffect(() => {
     // Load initial results
     const savedResults = qaTestRunner.getLastResults();
@@ -83,6 +89,14 @@ export default function QA() {
       try {
         setSmokeTestResults(JSON.parse(savedSmokeResults));
       } catch {}
+    }
+    
+    // Load feature test results if available
+    const savedFeatureResults = featureTestRunner.getLastResults();
+    setFeatureTestResults(savedFeatureResults);
+    if (savedFeatureResults.length > 0) {
+      const featureSummary = featureTestRunner.exportResults();
+      setFeatureTestSummary(featureSummary);
     }
   }, []);
 
@@ -242,6 +256,97 @@ export default function QA() {
     toast({
       title: 'Report Exported',
       description: 'QA test report downloaded successfully'
+    });
+  };
+
+  // Feature Tests Handlers
+  const handleRunFeatureTests = async () => {
+    setIsRunningFeatureTests(true);
+    setTestRunnerStatus('Running Feature Tests...');
+    
+    try {
+      const featureSummary = await featureTestRunner.runAllTests();
+      setFeatureTestResults(featureSummary.results);
+      setFeatureTestSummary(featureSummary);
+      
+      toast({
+        title: 'Feature Tests Completed',
+        description: `${featureSummary.passed}/${featureSummary.total} feature tests passed`,
+        variant: featureSummary.failed > 0 ? 'destructive' : 'default'
+      });
+      
+      setTestRunnerStatus('Feature tests completed');
+    } catch (error) {
+      setTestRunnerStatus('Feature tests failed');
+      toast({
+        title: 'Feature Tests Failed',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsRunningFeatureTests(false);
+      setTimeout(() => setTestRunnerStatus('Ready'), 2000);
+    }
+  };
+
+  const handleRunSingleFeatureTest = async (testId: string) => {
+    try {
+      const result = await featureTestRunner.runSingleTest(testId);
+      setFeatureTestResults(prev => prev.map(r => r.id === testId ? result : r));
+      
+      toast({
+        title: `${result.status === 'passed' ? 'Test Passed' : result.status === 'failed' ? 'Test Failed' : 'Test Skipped'}`,
+        description: result.notes || `${result.name} ${result.status}`,
+        variant: result.status === 'failed' ? 'destructive' : 'default'
+      });
+    } catch (error) {
+      toast({
+        title: 'Feature Test Failed',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleExportCombinedReport = () => {
+    const qaResults = qaTestRunner.exportResults();
+    const featureResults = featureTestRunner.exportResults();
+    
+    const combinedExport = {
+      timestamp: new Date().toISOString(),
+      qaTests: qaResults,
+      featureTests: featureResults,
+      smokeTests: smokeTestResults || null,
+      summary: {
+        qaTestsPassed: results.filter(r => r.pass).length,
+        qaTestsFailed: results.filter(r => !r.pass).length,
+        qaTestsTotal: results.length,
+        featureTestsPassed: featureTestResults.filter(r => r.status === 'passed').length,
+        featureTestsFailed: featureTestResults.filter(r => r.status === 'failed').length,
+        featureTestsSkipped: featureTestResults.filter(r => r.status === 'skipped').length,
+        featureTestsTotal: featureTestResults.length,
+        smokeTestsPassed: smokeTestResults?.passed || 0,
+        smokeTestsFailed: smokeTestResults?.failed || 0,
+        smokeTestsTotal: smokeTestResults?.totalTests || 0
+      },
+      environment: {
+        userAgent: navigator.userAgent,
+        url: window.location.href,
+        timestamp: new Date().toISOString()
+      }
+    };
+
+    const blob = new Blob([JSON.stringify(combinedExport, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `hustlehub-combined-qa-report-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    toast({
+      title: 'Combined Report Exported',
+      description: 'Complete QA, Feature, and Smoke test report downloaded successfully'
     });
   };
 
@@ -918,6 +1023,131 @@ export default function QA() {
                     </>
                   )}
                 </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Feature Tests Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Wrench className="h-5 w-5" />
+              Feature Tests
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              MVP Must-Have Feature Validation — Authentication, Settings, Sharing, Follow-ups, Clients, Performance
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <Button 
+                  onClick={handleRunFeatureTests} 
+                  disabled={isRunningFeatureTests || isSeeding || isRunning || isRunningSmokeTests}
+                  className="bg-accent hover:bg-accent/90"
+                >
+                  {isRunningFeatureTests ? 'Running...' : 'Run Feature Tests'}
+                </Button>
+                
+                <Button 
+                  onClick={handleExportCombinedReport} 
+                  disabled={!results.length && !smokeTestResults && !featureTestResults.length}
+                  variant="outline"
+                >
+                  <Download className="h-4 w-4 mr-1" />
+                  Export Combined Report
+                </Button>
+              </div>
+
+              {/* Feature Test Summary Cards */}
+              {featureTestSummary && (
+                <div className="grid grid-cols-4 gap-4 mt-4">
+                  <div className="text-center p-3 bg-success/10 rounded">
+                    <div className="text-xl font-bold text-success">{featureTestSummary.passed}</div>
+                    <div className="text-xs text-muted-foreground">Passed</div>
+                  </div>
+                  <div className="text-center p-3 bg-destructive/10 rounded">
+                    <div className="text-xl font-bold text-destructive">{featureTestSummary.failed}</div>
+                    <div className="text-xs text-muted-foreground">Failed</div>
+                  </div>
+                  <div className="text-center p-3 bg-warning/10 rounded">
+                    <div className="text-xl font-bold text-warning">{featureTestSummary.skipped}</div>
+                    <div className="text-xs text-muted-foreground">Skipped</div>
+                  </div>
+                  <div className="text-center p-3 bg-primary/10 rounded">
+                    <div className="text-xl font-bold text-primary">{featureTestSummary.total}</div>
+                    <div className="text-xs text-muted-foreground">Total</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Feature Tests Table */}
+              {featureTestResults.length > 0 && (
+                <div className="border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Notes</TableHead>
+                        <TableHead>Actions</TableHead>
+                        <TableHead>Last Run</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {FEATURE_TESTS.map(test => {
+                        const result = featureTestResults.find(r => r.id === test.id);
+                        return (
+                          <TableRow key={test.id}>
+                            <TableCell className="font-mono text-sm">{test.id}</TableCell>
+                            <TableCell className="font-medium">{test.name}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {result?.status === 'passed' && <CheckCircle className="h-4 w-4 text-success" />}
+                                {result?.status === 'failed' && <AlertCircle className="h-4 w-4 text-destructive" />}
+                                {result?.status === 'skipped' && <Clock className="h-4 w-4 text-warning" />}
+                                {!result && <Clock className="h-4 w-4 text-muted-foreground" />}
+                                
+                                {result?.status === 'passed' && <Badge variant="secondary">✅</Badge>}
+                                {result?.status === 'failed' && <Badge variant="destructive">❌</Badge>}
+                                {result?.status === 'skipped' && <Badge variant="outline">⏭️</Badge>}
+                                {!result && <Badge variant="outline">Not Run</Badge>}
+                              </div>
+                            </TableCell>
+                            <TableCell className="max-w-xs">
+                              <div className="truncate text-sm text-muted-foreground" title={result?.notes}>
+                                {result?.notes || test.description}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleRunSingleFeatureTest(test.id)}
+                                disabled={isRunningFeatureTests || isSeeding || isRunning || isRunningSmokeTests}
+                              >
+                                Run
+                              </Button>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {result?.lastRun ? new Date(result.lastRun).toLocaleString() : 'Never'}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {/* Feature Tests Info */}
+              <div className="text-xs text-muted-foreground border-t pt-4">
+                <p>• Feature tests validate MVP must-have functionality before production</p>
+                <p>• Tests are non-destructive and clean up after themselves</p>
+                <p>• Skipped tests indicate features not yet implemented</p>
               </div>
             </div>
           </CardContent>
