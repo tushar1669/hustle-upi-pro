@@ -15,16 +15,14 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="p-6">
-            <div className="space-y-4">
-              <Skeleton className="h-8 w-3/4 mx-auto" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-2/3" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          </CardContent>
-        </Card>
+        <div className="text-center space-y-4">
+          <img 
+            src="/lovable-uploads/13a7cb4f-ee68-4e41-a34e-1ad7391b1f85.png" 
+            alt="HustleHub" 
+            className="h-20 w-auto mx-auto"
+          />
+          <div className="text-lg font-medium text-muted-foreground">Loading...</div>
+        </div>
       </div>
     );
   }

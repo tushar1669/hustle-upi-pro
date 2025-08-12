@@ -116,7 +116,12 @@ export default function SignIn() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Welcome to HustleHub</CardTitle>
+          <img 
+            src="/lovable-uploads/13a7cb4f-ee68-4e41-a34e-1ad7391b1f85.png" 
+            alt="HustleHub" 
+            className="h-16 w-auto mx-auto mb-4"
+          />
+          <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
           <p className="text-muted-foreground">Sign in to manage your business</p>
         </CardHeader>
         <CardContent>

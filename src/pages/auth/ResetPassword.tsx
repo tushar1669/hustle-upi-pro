@@ -120,6 +120,11 @@ export default function ResetPassword() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
+          <img 
+            src="/lovable-uploads/13a7cb4f-ee68-4e41-a34e-1ad7391b1f85.png" 
+            alt="HustleHub" 
+            className="h-16 w-auto mx-auto mb-4"
+          />
           <CardTitle className="text-2xl font-bold">Reset Your Password</CardTitle>
           <p className="text-muted-foreground">Enter your new password below</p>
         </CardHeader>
