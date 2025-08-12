@@ -29,6 +29,8 @@ export default function AddTaskModal({ isOpen, onClose, onSuccess }: AddTaskModa
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    toast({ title: "Creating task..." });
+    
     try {
       const task = await create_task({
         title: formData.title,
@@ -39,20 +41,23 @@ export default function AddTaskModal({ isOpen, onClose, onSuccess }: AddTaskModa
         notes: formData.notes || null
       });
       
+      // Log task creation
       await create_message_log({
         related_type: "task",
         related_id: task.id,
         channel: "whatsapp",
         template_used: "task_created",
-        outcome: "created"
+        outcome: "ok"
       });
 
+      // Success actions
       onSuccess();
       setFormData({ title: "", project_id: "", due_date: "", is_billable: false, notes: "" });
       onClose();
-      toast({ title: "Task created successfully" });
-    } catch (error) {
-      toast({ title: "Error creating task", variant: "destructive" });
+      toast({ title: "✅ Task created successfully" });
+    } catch (error: any) {
+      console.error('Task creation error:', error);
+      toast({ title: "❌ Error creating task", description: error.message || "Unknown error", variant: "destructive" });
     }
   };
 

@@ -32,8 +32,10 @@ import type { TestRunSummary } from '@/qa/testRunner';
 // Import Supabase and collections for demo data
 import { supabase } from '@/lib/supabase';
 import * as collections from '@/data/collections';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function QA() {
+  const queryClient = useQueryClient();
   const [isRunning, setIsRunning] = useState(false);
   const [isFixing, setIsFixing] = useState(false);
   const [fixMode, setFixMode] = useState(qaTestRunner.getFixMode());
@@ -229,44 +231,32 @@ export default function QA() {
 
   const populateDemoData = async () => {
     setIsPopulating(true);
-    console.log('Starting demo data population...');
+    toast({ title: "🚀 Starting demo data population..." });
+    
     try {
       const sb = supabase();
-      console.log('Supabase client:', sb);
+      let createdCounts = { settings: 0, clients: 0, projects: 0, invoices: 0, items: 0, reminders: 0, tasks: 0, logs: 0 };
       
       // Test connection first
-      const { data: testData, error: testError } = await sb.from('clients').select('count', { count: 'exact' }).limit(1);
-      console.log('Connection test:', { testData, testError });
-      
+      const { error: testError } = await sb.from('clients').select('count', { count: 'exact' }).limit(1);
       if (testError) {
         throw new Error(`Database connection failed: ${testError.message}`);
       }
       
-      const today = new Date().toISOString().split('T')[0];
-      console.log('Today:', today);
-      
-      // 1. Ensure settings exist
-      console.log('Checking settings...');
-      const existingSettings = await collections.settings_one();
-      console.log('Existing settings:', existingSettings);
-      
+      // 1. Ensure settings exist (idempotent)
+      const { data: existingSettings } = await sb.from('settings').select('*').limit(1).maybeSingle();
       if (!existingSettings) {
-        console.log('Creating settings...');
-        const { data: newSettings, error: settingsError } = await sb.from('settings').insert({
+        const { error: settingsError } = await sb.from('settings').insert({
           creator_display_name: 'HustleHub Demo',
           upi_vpa: 'demo@upi',
           default_gst_percent: 18,
           invoice_prefix: 'HH'
-        }).select().single();
-        
-        if (settingsError) {
-          console.error('Settings creation error:', settingsError);
-          throw new Error(`Failed to create settings: ${settingsError.message}`);
-        }
-        console.log('Settings created:', newSettings);
+        });
+        if (settingsError) throw new Error(`Settings creation failed: ${settingsError.message}`);
+        createdCounts.settings = 1;
       }
 
-      // 2. Create clients (idempotent)
+      // 2. Create clients (idempotent by name)
       const clientsToCreate = [
         { name: 'Acme Studios', whatsapp: '+1234567890', email: 'contact@acmestudios.com', upi_vpa: 'acmestudios@upi' },
         { name: 'Bright Ideas', whatsapp: '+1234567891', email: 'hello@brightideas.com', upi_vpa: 'bright@upi' },
@@ -274,49 +264,40 @@ export default function QA() {
         { name: 'QA Co', whatsapp: '+1234567893', email: 'test@qaco.com', upi_vpa: 'qaco@upi' }
       ];
 
-      console.log('Creating clients...');
-      const createdClients = [];
+      const clients = [];
       for (const clientData of clientsToCreate) {
-        console.log('Checking client:', clientData.name);
-        const { data: existing, error: existingError } = await sb.from('clients').select('*').eq('name', clientData.name).maybeSingle();
-        
-        if (existingError) {
-          console.error('Error checking existing client:', existingError);
-          throw new Error(`Failed to check client ${clientData.name}: ${existingError.message}`);
-        }
-        
+        const { data: existing } = await sb.from('clients').select('*').eq('name', clientData.name).maybeSingle();
         if (!existing) {
-          console.log('Creating new client:', clientData.name);
-          const { data: newClient, error: clientError } = await sb.from('clients').insert(clientData).select('*').single();
-          
-          if (clientError) {
-            console.error('Client creation error:', clientError);
-            throw new Error(`Failed to create client ${clientData.name}: ${clientError.message}`);
-          }
-          
-          createdClients.push(newClient);
-          console.log('Client created:', newClient);
+          const { data: newClient, error } = await sb.from('clients').insert(clientData).select('*').single();
+          if (error) throw new Error(`Client creation failed for ${clientData.name}: ${error.message}`);
+          clients.push(newClient);
+          createdCounts.clients++;
         } else {
-          createdClients.push(existing);
-          console.log('Client already exists:', existing);
+          clients.push(existing);
         }
       }
 
-      const acmeClient = createdClients.find(c => c.name === 'Acme Studios');
+      const acmeClient = clients.find(c => c.name === 'Acme Studios');
 
-      // 3. Create project for Acme Studios
-      const { data: existingProject } = await sb.from('projects').select('*').eq('name', 'Website Revamp').single();
-      let project = existingProject;
-      if (!existingProject && acmeClient) {
-        const { data: newProject } = await sb.from('projects').insert({
-          client_id: acmeClient.id,
-          name: 'Website Revamp',
-          is_billable: true
-        }).select('*').single();
-        project = newProject;
+      // 3. Create project for Acme Studios (idempotent)
+      let project = null;
+      if (acmeClient) {
+        const { data: existingProject } = await sb.from('projects').select('*').eq('name', 'Website Revamp').eq('client_id', acmeClient.id).maybeSingle();
+        if (!existingProject) {
+          const { data: newProject, error } = await sb.from('projects').insert({
+            client_id: acmeClient.id,
+            name: 'Website Revamp',
+            is_billable: true
+          }).select('*').single();
+          if (error) throw new Error(`Project creation failed: ${error.message}`);
+          project = newProject;
+          createdCounts.projects = 1;
+        } else {
+          project = existingProject;
+        }
       }
 
-      // 4. Create invoices (check by invoice_number)
+      // 4. Create QA invoices (idempotent by invoice_number)
       const invoicesToCreate = [
         {
           invoice_number: 'QA-2025-1001',
@@ -327,7 +308,7 @@ export default function QA() {
           subtotal: 25000,
           gst_amount: 4500,
           total_amount: 29500,
-          status: 'paid' as const,
+          status: 'paid',
           paid_date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           utr_reference: 'UTR-QA-1'
         },
@@ -340,7 +321,7 @@ export default function QA() {
           subtotal: 18000,
           gst_amount: 3240,
           total_amount: 21240,
-          status: 'sent' as const
+          status: 'sent'
         },
         {
           invoice_number: 'QA-2025-1003',
@@ -351,122 +332,147 @@ export default function QA() {
           subtotal: 10000,
           gst_amount: 1800,
           total_amount: 11800,
-          status: 'overdue' as const
+          status: 'overdue'
         }
       ];
 
-      const createdInvoices = [];
+      const invoices = [];
       for (const invoiceData of invoicesToCreate) {
-        const { data: existing } = await sb.from('invoices').select('*').eq('invoice_number', invoiceData.invoice_number).single();
+        const { data: existing } = await sb.from('invoices').select('*').eq('invoice_number', invoiceData.invoice_number).maybeSingle();
         if (!existing && invoiceData.client_id) {
           const { data: newInvoice, error } = await sb.from('invoices').insert(invoiceData).select('*').single();
-          if (error) throw error;
-          createdInvoices.push(newInvoice);
+          if (error) throw new Error(`Invoice creation failed for ${invoiceData.invoice_number}: ${error.message}`);
+          invoices.push(newInvoice);
+          createdCounts.invoices++;
         } else if (existing) {
-          createdInvoices.push(existing);
+          invoices.push(existing);
         }
       }
 
-      // 5. Create invoice items
+      // 5. Create invoice items (idempotent)
       const itemsToCreate = [
         { title: 'UI Design Sprint', amount: 25000 },
         { title: 'Brand Kit', amount: 18000 },
         { title: 'Content Pack', amount: 10000 }
       ];
 
-      for (let i = 0; i < createdInvoices.length && i < itemsToCreate.length; i++) {
-        const invoice = createdInvoices[i];
+      for (let i = 0; i < invoices.length && i < itemsToCreate.length; i++) {
+        const invoice = invoices[i];
         const itemData = itemsToCreate[i];
         
-        const { data: existingItem } = await sb.from('invoice_items').select('*').eq('invoice_id', invoice.id).eq('title', itemData.title).single();
+        const { data: existingItem } = await sb.from('invoice_items').select('*').eq('invoice_id', invoice.id).eq('title', itemData.title).maybeSingle();
         if (!existingItem) {
-          await sb.from('invoice_items').insert({
+          const { error } = await sb.from('invoice_items').insert({
             invoice_id: invoice.id,
             title: itemData.title,
             qty: 1,
             rate: itemData.amount,
             amount: itemData.amount
           });
+          if (error) throw new Error(`Invoice item creation failed: ${error.message}`);
+          createdCounts.items++;
         }
       }
 
-      // 6. Create reminders for sent/overdue invoices
-      const sentInvoice = createdInvoices.find(inv => inv.invoice_number === 'QA-2025-1002');
-      const overdueInvoice = createdInvoices.find(inv => inv.invoice_number === 'QA-2025-1003');
+      // 6. Create reminders for sent/overdue invoices (idempotent)
+      const sentInvoice = invoices.find(inv => inv.invoice_number === 'QA-2025-1002');
+      const overdueInvoice = invoices.find(inv => inv.invoice_number === 'QA-2025-1003');
       
       for (const invoice of [sentInvoice, overdueInvoice].filter(Boolean)) {
-        const { data: existingReminders } = await sb.from('reminders').select('*').eq('invoice_id', invoice.id).eq('status', 'pending');
-        const existingCount = existingReminders?.length || 0;
+        const reminderDates = [3, 7, 14].map(days => new Date(Date.now() + days * 24 * 60 * 60 * 1000));
         
-        if (existingCount < 3) {
-          const reminderDates = [3, 7, 14].slice(existingCount);
-          for (const days of reminderDates) {
-            await sb.from('reminders').insert({
+        for (const reminderDate of reminderDates) {
+          const scheduledAt = reminderDate.toISOString();
+          const { data: existing } = await sb.from('reminders').select('*')
+            .eq('invoice_id', invoice.id)
+            .gte('scheduled_at', new Date(reminderDate.getTime() - 2 * 60 * 60 * 1000).toISOString())
+            .lte('scheduled_at', new Date(reminderDate.getTime() + 2 * 60 * 60 * 1000).toISOString())
+            .maybeSingle();
+            
+          if (!existing) {
+            const { error } = await sb.from('reminders').insert({
               invoice_id: invoice.id,
-              scheduled_at: new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString(),
-              channel: 'whatsapp' as const,
-              status: 'pending' as const
+              scheduled_at: scheduledAt,
+              channel: 'whatsapp',
+              status: 'pending'
             });
+            if (error) throw new Error(`Reminder creation failed: ${error.message}`);
+            createdCounts.reminders++;
           }
         }
       }
 
-      // 7. Create tasks
+      // 7. Create demo tasks (idempotent by title)
       const tasksToCreate = [
-        { title: 'Send assets to Acme', due_date: today, is_billable: true, status: 'open' as const },
-        { title: 'Bright Ideas review call', due_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], is_billable: false, status: 'open' as const },
-        { title: 'Portfolio refresh', due_date: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], is_billable: false, status: 'open' as const }
+        { title: 'Send assets to Acme', due_date: new Date().toISOString().split('T')[0], is_billable: true, status: 'open' },
+        { title: 'Bright Ideas review call', due_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], is_billable: false, status: 'open' },
+        { title: 'Portfolio refresh', due_date: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], is_billable: false, status: 'open' }
       ];
 
       for (const taskData of tasksToCreate) {
-        const { data: existing } = await sb.from('tasks').select('*').eq('title', taskData.title).single();
+        const { data: existing } = await sb.from('tasks').select('*').eq('title', taskData.title).maybeSingle();
         if (!existing) {
-          await sb.from('tasks').insert(taskData);
+          const { data: newTask, error } = await sb.from('tasks').insert({
+            ...taskData,
+            project_id: project?.id || null
+          }).select('*').single();
+          if (error) throw new Error(`Task creation failed for ${taskData.title}: ${error.message}`);
+          createdCounts.tasks++;
+          
+          // Log task creation
+          await sb.from('message_log').insert({
+            related_type: 'task',
+            related_id: newTask.id,
+            channel: 'whatsapp',
+            template_used: 'task_created',
+            outcome: 'ok',
+            notes: `QA seeded task: ${taskData.title}`
+          });
+          createdCounts.logs++;
         }
       }
 
-      // 8. Create sample message log entries
+      // 8. Create additional message log entries
       const logEntries = [
-        { related_type: 'qa' as const, related_id: 'demo', template_used: 'invoice_draft', outcome: 'created', channel: 'whatsapp' as const },
-        { related_type: 'qa' as const, related_id: 'demo', template_used: 'invoice_sent', outcome: 'delivered', channel: 'email' as const },
-        { related_type: 'qa' as const, related_id: 'demo', template_used: 'reminder_sent', outcome: 'delivered', channel: 'whatsapp' as const },
-        { related_type: 'qa' as const, related_id: 'demo', template_used: 'invoice_paid', outcome: 'confirmed', channel: 'email' as const },
-        { related_type: 'qa' as const, related_id: 'demo', template_used: 'task_created', outcome: 'logged', channel: 'whatsapp' as const }
+        { related_type: 'invoice', related_id: invoices[0]?.id, template_used: 'invoice_draft', outcome: 'ok', notes: 'QA seeded invoice draft' },
+        { related_type: 'invoice', related_id: invoices[1]?.id, template_used: 'invoice_sent', outcome: 'ok', notes: 'QA seeded invoice sent' },
+        { related_type: 'invoice', related_id: invoices[0]?.id, template_used: 'invoice_paid', outcome: 'ok', notes: 'QA seeded invoice paid' },
+        { related_type: 'reminder', template_used: 'reminder_sent', outcome: 'ok', notes: 'QA seeded reminder sent' }
       ];
 
-      for (const logEntry of logEntries) {
-        await sb.from('message_log').insert(logEntry);
+      for (const logData of logEntries.filter(log => log.related_id)) {
+        await sb.from('message_log').insert({
+          ...logData,
+          channel: 'whatsapp'
+        });
+        createdCounts.logs++;
       }
 
-      // 9. Log the seeding operation
-      await sb.from('message_log').insert({
-        related_type: 'qa' as const,
-        related_id: 'seeder',
-        template_used: 'qa_seed',
-        outcome: 'applied',
-        channel: 'whatsapp' as const
+      // Invalidate all React Query caches
+      await queryClient.invalidateQueries({ queryKey: ['invoices_all'] });
+      await queryClient.invalidateQueries({ queryKey: ['invoice_items'] });
+      await queryClient.invalidateQueries({ queryKey: ['reminders'] });
+      await queryClient.invalidateQueries({ queryKey: ['tasks_all'] });
+      await queryClient.invalidateQueries({ queryKey: ['clients_all'] });
+      await queryClient.invalidateQueries({ queryKey: ['projects_all'] });
+      await queryClient.invalidateQueries({ queryKey: ['message_log_recent'] });
+      await queryClient.invalidateQueries({ queryKey: ['v_dashboard_metrics'] });
+
+      await loadDemoDataCounts();
+      
+      toast({ 
+        title: "✅ Demo data populated successfully!", 
+        description: `Created: ${Object.entries(createdCounts).filter(([,v]) => v > 0).map(([k,v]) => `${v} ${k}`).join(', ')}` 
       });
 
-      // Reload counts
-      await loadDemoDataCounts();
-
-      // Auto-run tests after successful population
+      // Auto-run QA tests after successful population
       setTimeout(() => {
         handleRunAllTests();
       }, 1000);
 
-      toast({
-        title: 'Demo Data Populated',
-        description: 'Successfully created demo clients, invoices, tasks, and reminders'
-      });
-
-    } catch (error) {
-      console.error('Error populating demo data:', error);
-      toast({
-        title: 'Population Failed',
-        description: error instanceof Error ? error.message : 'Unknown error occurred',
-        variant: 'destructive'
-      });
+    } catch (error: any) {
+      console.error('Demo data population error:', error);
+      toast({ title: "❌ Error populating demo data", description: error.message, variant: "destructive" });
     } finally {
       setIsPopulating(false);
     }
@@ -474,48 +480,76 @@ export default function QA() {
 
   const resetDemoData = async () => {
     setIsResetting(true);
+    toast({ title: "🧹 Starting demo data cleanup..." });
+    
     try {
       const sb = supabase();
+      let deletedCounts = { invoices: 0, items: 0, reminders: 0, tasks: 0, clients: 0, logs: 0 };
+      
+      // 1. Get QA invoice IDs first (for cascade operations)
+      const { data: qaInvoices } = await sb.from('invoices').select('id').ilike('invoice_number', 'QA-%');
+      const qaInvoiceIds = qaInvoices?.map(inv => inv.id) || [];
+      
+      // 2. Delete reminders for QA invoices
+      if (qaInvoiceIds.length > 0) {
+        const { count: reminderCount } = await sb.from('reminders')
+          .delete({ count: 'exact' })
+          .in('invoice_id', qaInvoiceIds);
+        deletedCounts.reminders = reminderCount || 0;
+      }
+      
+      // 3. Delete invoice items for QA invoices  
+      if (qaInvoiceIds.length > 0) {
+        const { count: itemCount } = await sb.from('invoice_items')
+          .delete({ count: 'exact' })
+          .in('invoice_id', qaInvoiceIds);
+        deletedCounts.items = itemCount || 0;
+      }
+      
+      // 4. Delete QA invoices
+      const { count: invoiceCount } = await sb.from('invoices')
+        .delete({ count: 'exact' })
+        .ilike('invoice_number', 'QA-%');
+      deletedCounts.invoices = invoiceCount || 0;
+      
+      // 5. Delete specific QA tasks (by title)
+      const qaTaskTitles = ['Send assets to Acme', 'Bright Ideas review call', 'Portfolio refresh'];
+      const { count: taskCount } = await sb.from('tasks')
+        .delete({ count: 'exact' })
+        .in('title', qaTaskTitles);
+      deletedCounts.tasks = taskCount || 0;
+      
+      // 6. Delete QA Co client only (preserve Acme, Bright Ideas, Creative Minds)
+      const { count: clientCount } = await sb.from('clients')
+        .delete({ count: 'exact' })
+        .eq('name', 'QA Co');
+      deletedCounts.clients = clientCount || 0;
+      
+      // 7. Delete QA-related message logs
+      const { count: logCount } = await sb.from('message_log')
+        .delete({ count: 'exact' })
+        .or('notes.ilike.%QA%,template_used.in.(task_created),outcome.eq.ok');
+      deletedCounts.logs = logCount || 0;
 
-      // Delete QA invoices and their related data (cascades)
-      await sb.from('invoices').delete().like('invoice_number', 'QA-%');
+      // Invalidate all React Query caches
+      await queryClient.invalidateQueries({ queryKey: ['invoices_all'] });
+      await queryClient.invalidateQueries({ queryKey: ['invoice_items'] });
+      await queryClient.invalidateQueries({ queryKey: ['reminders'] });
+      await queryClient.invalidateQueries({ queryKey: ['tasks_all'] });
+      await queryClient.invalidateQueries({ queryKey: ['clients_all'] });
+      await queryClient.invalidateQueries({ queryKey: ['projects_all'] });
+      await queryClient.invalidateQueries({ queryKey: ['message_log_recent'] });
+      await queryClient.invalidateQueries({ queryKey: ['v_dashboard_metrics'] });
 
-      // Delete QA clients
-      await sb.from('clients').delete().or('name.eq.Acme Studios,name.eq.Bright Ideas,name.eq.Creative Minds,name.eq.QA Co');
-
-      // Delete QA projects
-      await sb.from('projects').delete().eq('name', 'Website Revamp');
-
-      // Delete QA tasks
-      await sb.from('tasks').delete().or('title.eq.Send assets to Acme,title.eq.Bright Ideas review call,title.eq.Portfolio refresh');
-
-      // Delete QA message logs
-      await sb.from('message_log').delete().eq('related_type', 'qa');
-
-      // Log the reset operation
-      await sb.from('message_log').insert({
-        related_type: 'qa' as const,
-        related_id: 'seeder',
-        template_used: 'qa_reset',
-        outcome: 'applied',
-        channel: 'whatsapp' as const
-      });
-
-      // Reload counts
       await loadDemoDataCounts();
-
-      toast({
-        title: 'Demo Data Reset',
-        description: 'Successfully removed all QA test data'
+      
+      toast({ 
+        title: "✅ Demo data reset successfully!", 
+        description: `Deleted: ${Object.entries(deletedCounts).filter(([,v]) => v > 0).map(([k,v]) => `${v} ${k}`).join(', ')}` 
       });
-
-    } catch (error) {
-      console.error('Error resetting demo data:', error);
-      toast({
-        title: 'Reset Failed',
-        description: error instanceof Error ? error.message : 'Unknown error occurred',
-        variant: 'destructive'
-      });
+    } catch (error: any) {
+      console.error('Demo data reset error:', error);
+      toast({ title: "❌ Error resetting demo data", description: error.message, variant: "destructive" });
     } finally {
       setIsResetting(false);
     }

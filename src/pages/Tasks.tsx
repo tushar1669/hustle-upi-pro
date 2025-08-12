@@ -55,7 +55,7 @@ const TaskCard = ({ task, onMarkDone, projects, clients }: { task: any; onMarkDo
 };
 
 export default function Tasks() {
-  const { data: tasks = [], refetch: refetchTasks } = useQuery({ queryKey: ["tasks_all"], queryFn: tasks_all });
+  const { data: tasks = [] } = useQuery({ queryKey: ["tasks_all"], queryFn: tasks_all });
   const { data: projects = [] } = useQuery({ queryKey: ["projects_all"], queryFn: projects_all });
   const { data: clients = [] } = useQuery({ queryKey: ["clients_all"], queryFn: clients_all });
   
@@ -76,20 +76,29 @@ export default function Tasks() {
   });
 
   const handleMarkDone = async (taskId: string) => {
+    toast({ title: "Marking task as done..." });
+    
     try {
       await update_task(taskId, { status: "done" });
+      
+      // Log task completion
       await create_message_log({
         related_type: "task",
         related_id: taskId,
         channel: "whatsapp",
         template_used: "task_completed",
-        outcome: "completed"
+        outcome: "ok"
       });
-      await refetchTasks();
+      
+      // Invalidate all relevant caches
       queryClient.invalidateQueries({ queryKey: ["tasks_all"] });
-      toast({ title: "Task marked as done" });
-    } catch (error) {
-      toast({ title: "Error updating task", variant: "destructive" });
+      queryClient.invalidateQueries({ queryKey: ["v_dashboard_metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["message_log_recent"] });
+      
+      toast({ title: "✅ Task marked as done" });
+    } catch (error: any) {
+      console.error('Task update error:', error);
+      toast({ title: "❌ Error updating task", description: error.message || "Unknown error", variant: "destructive" });
     }
   };
 
@@ -315,8 +324,10 @@ export default function Tasks() {
         isOpen={showAddModal} 
         onClose={() => setShowAddModal(false)} 
         onSuccess={() => {
-          refetchTasks();
+          // Invalidate all relevant caches
           queryClient.invalidateQueries({ queryKey: ["tasks_all"] });
+          queryClient.invalidateQueries({ queryKey: ["v_dashboard_metrics"] });
+          queryClient.invalidateQueries({ queryKey: ["message_log_recent"] });
         }} 
       />
     </div>
