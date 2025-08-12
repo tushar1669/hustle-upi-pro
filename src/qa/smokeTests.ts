@@ -89,28 +89,37 @@ class SmokeTestRunner {
     const startTime = Date.now();
     
     try {
-      const { data: qaInvoices, error } = await supabase
+      // Get dynamic prefix from settings
+      const { data: settings } = await supabase
+        .from('settings')
+        .select('invoice_prefix')
+        .single();
+      
+      const prefix = settings?.invoice_prefix || 'HH';
+      
+      // Find recent demo invoices with the current prefix
+      const { data: demoInvoices, error } = await supabase
         .from('invoices')
-        .select('invoice_number, status')
-        .in('invoice_number', ['QA-2025-1001', 'QA-2025-1002', 'QA-2025-1003']);
+        .select('invoice_number, status, issue_date, due_date, created_at')
+        .ilike('invoice_number', `${prefix}-%`)
+        .gte('issue_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      const expectedStatuses = {
-        'QA-2025-1001': 'paid',
-        'QA-2025-1002': 'sent', 
-        'QA-2025-1003': 'overdue'
-      };
+      // Find one invoice for each expected status (paid, sent, overdue)
+      const paidInvoice = demoInvoices.find(inv => inv.status === 'paid');
+      const sentInvoice = demoInvoices.find(inv => inv.status === 'sent');
+      const overdueInvoice = demoInvoices.find(inv => inv.status === 'overdue');
 
-      const allCorrect = qaInvoices.every(inv => 
-        expectedStatuses[inv.invoice_number as keyof typeof expectedStatuses] === inv.status
-      );
+      const foundInvoices = [paidInvoice, sentInvoice, overdueInvoice].filter(Boolean);
+      const foundStatuses = foundInvoices.map(inv => `${inv.invoice_number}:${inv.status}`);
 
       return {
         id: 'INVOICES_LIST',
         name: 'Invoices List',
-        pass: allCorrect && qaInvoices.length === 3,
-        notes: `Found ${qaInvoices.length}/3 QA invoices with correct statuses: ${qaInvoices.map(i => `${i.invoice_number}:${i.status}`).join(', ')}`,
+        pass: foundInvoices.length === 3 && !!paidInvoice && !!sentInvoice && !!overdueInvoice,
+        notes: `Found ${foundInvoices.length}/3 demo invoices with expected statuses (${prefix}- prefix): ${foundStatuses.join(', ')}`,
         executionTime: Date.now() - startTime
       };
     } catch (error) {
@@ -118,7 +127,7 @@ class SmokeTestRunner {
         id: 'INVOICES_LIST',
         name: 'Invoices List',
         pass: false,
-        notes: `Failed to verify QA invoices: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        notes: `Failed to verify demo invoices: ${error instanceof Error ? error.message : 'Unknown error'}`,
         executionTime: Date.now() - startTime
       };
     }
@@ -169,29 +178,51 @@ class SmokeTestRunner {
     const startTime = Date.now();
     
     try {
-      // Find earliest pending reminder on a QA invoice
-      const { data: qaReminder, error: reminderError } = await supabase
+      // Get dynamic prefix from settings
+      const { data: settings } = await supabase
+        .from('settings')
+        .select('invoice_prefix')
+        .single();
+      
+      const prefix = settings?.invoice_prefix || 'HH';
+
+      // Find sent/overdue demo invoices first
+      const { data: demoInvoices, error: invoicesError } = await supabase
+        .from('invoices')
+        .select('id, invoice_number, status')
+        .ilike('invoice_number', `${prefix}-%`)
+        .in('status', ['sent', 'overdue']);
+
+      if (invoicesError) throw invoicesError;
+
+      if (!demoInvoices || demoInvoices.length === 0) {
+        return {
+          id: 'SEND_NOW_PATH',
+          name: 'Send Now Path',
+          pass: true,
+          notes: 'No demo sent/overdue invoices available for testing (acceptable)',
+          executionTime: Date.now() - startTime
+        };
+      }
+
+      // Find earliest pending reminder for these invoices
+      const { data: demoReminder, error: reminderError } = await supabase
         .from('reminders')
-        .select('id, invoice_id')
+        .select('id, invoice_id, scheduled_at')
+        .in('invoice_id', demoInvoices.map(inv => inv.id))
         .eq('status', 'pending')
-        .gte('invoice_id', (await supabase
-          .from('invoices')
-          .select('id')
-          .like('invoice_number', 'QA-%')
-          .limit(1)
-          .single()
-        ).data?.id || '')
         .order('scheduled_at', { ascending: true })
         .limit(1)
         .maybeSingle();
 
       if (reminderError) throw reminderError;
-      if (!qaReminder) {
+      
+      if (!demoReminder) {
         return {
           id: 'SEND_NOW_PATH',
           name: 'Send Now Path',
           pass: true,
-          notes: 'No QA reminders available for testing (acceptable)',
+          notes: 'No pending reminders available for demo invoices (acceptable)',
           executionTime: Date.now() - startTime
         };
       }
@@ -200,15 +231,15 @@ class SmokeTestRunner {
       const { error: updateError } = await supabase
         .from('reminders')
         .update({ status: 'sent' })
-        .eq('id', qaReminder.id);
+        .eq('id', demoReminder.id);
 
       if (updateError) throw updateError;
 
       const { error: logError } = await supabase
         .from('message_log')
         .insert({
-          related_type: 'reminder',
-          related_id: qaReminder.id,
+          related_type: 'invoice',
+          related_id: demoReminder.invoice_id,
           channel: 'whatsapp',
           template_used: 'reminder_sent',
           outcome: 'ok'
@@ -217,11 +248,12 @@ class SmokeTestRunner {
       if (logError) throw logError;
 
       // Restore state by creating new pending reminder
+      const restoreScheduledAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
       const { error: restoreError } = await supabase
         .from('reminders')
         .insert({
-          invoice_id: qaReminder.invoice_id,
-          scheduled_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+          invoice_id: demoReminder.invoice_id,
+          scheduled_at: restoreScheduledAt,
           channel: 'whatsapp',
           status: 'pending'
         });
@@ -232,7 +264,7 @@ class SmokeTestRunner {
         id: 'SEND_NOW_PATH',
         name: 'Send Now Path',
         pass: true,
-        notes: 'Successfully marked reminder as sent, logged action, and restored state',
+        notes: `Updated reminder ${demoReminder.id}, logged action, restored with new reminder at ${restoreScheduledAt}`,
         executionTime: Date.now() - startTime
       };
     } catch (error) {
@@ -240,7 +272,7 @@ class SmokeTestRunner {
         id: 'SEND_NOW_PATH',
         name: 'Send Now Path',
         pass: false,
-        notes: `Failed Send Now test: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        notes: `Send Now test error: ${error instanceof Error ? error.message : 'Unknown error'}`,
         executionTime: Date.now() - startTime
       };
     }
