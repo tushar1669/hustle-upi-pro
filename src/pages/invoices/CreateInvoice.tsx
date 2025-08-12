@@ -194,8 +194,7 @@ export default function CreateInvoice() {
         subtotal,
         gst_amount: gstAmount,
         total_amount: totalAmount,
-        status: "draft" as const,
-        notes: notes || null
+        status: "draft" as const
       };
 
       const invoice = await create_invoice(invoiceData);
@@ -259,8 +258,7 @@ export default function CreateInvoice() {
         subtotal,
         gst_amount: gstAmount,
         total_amount: totalAmount,
-        status: "sent" as const,
-        notes: notes || null
+        status: "sent" as const
       };
 
       const invoice = await create_invoice(invoiceData);
