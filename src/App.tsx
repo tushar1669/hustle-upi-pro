@@ -13,10 +13,12 @@ import CreateInvoice from "@/pages/invoices/CreateInvoice";
 import Tasks from "./pages/Tasks";
 import Clients from "./pages/Clients";
 import FollowUps from "./pages/FollowUps";
+import Settings from "./pages/Settings";
 import QA from "./pages/QA";
 import SignIn from "./pages/auth/SignIn";
 import SignUp from "./pages/auth/SignUp";
 import ResetPassword from "./pages/auth/ResetPassword";
+import { CelebrationProvider } from "@/components/CelebrationProvider";
 
 const queryClient = new QueryClient();
 
@@ -34,9 +36,10 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
+        <CelebrationProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
           <Routes>
             {/* Auth routes - public */}
             <Route path="/auth/signin" element={<SignIn />} />
@@ -51,6 +54,7 @@ const App = () => (
               <Route path="tasks" element={<Tasks />} />
               <Route path="clients" element={<Clients />} />
               <Route path="follow-ups" element={<FollowUps />} />
+              <Route path="settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Route>
             
@@ -61,7 +65,8 @@ const App = () => (
               </ProtectedRoute>
             } />
           </Routes>
-        </BrowserRouter>
+          </BrowserRouter>
+        </CelebrationProvider>
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>

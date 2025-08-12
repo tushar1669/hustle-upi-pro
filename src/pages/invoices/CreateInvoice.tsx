@@ -25,6 +25,7 @@ import {
   update_invoice
 } from "@/data/collections";
 import { useToast } from "@/hooks/use-toast";
+import { useCelebrationContext } from "@/components/CelebrationProvider";
 import AddClientModal from "@/components/AddClientModal";
 import AddProjectModal from "@/components/AddProjectModal";
 import { CACHE_KEYS, invalidateInvoiceCaches } from "@/hooks/useCache";
@@ -44,6 +45,7 @@ export default function CreateInvoice() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { celebrate } = useCelebrationContext();
 
   const { data: settings, isLoading: settingsLoading, error: settingsError } = useQuery({ 
     queryKey: CACHE_KEYS.SETTINGS, 
@@ -316,6 +318,7 @@ export default function CreateInvoice() {
         queryClient.invalidateQueries({ queryKey: CACHE_KEYS.DASHBOARD })
       ]);
       toast({ title: "Invoice sent successfully" });
+      celebrate('invoice_sent');
       navigate("/invoices");
     } catch (error) {
       console.error('Send invoice error:', error);
@@ -378,7 +381,7 @@ export default function CreateInvoice() {
             <FileText className="h-4 w-4 mr-2" />
             Save Draft
           </Button>
-          <Button onClick={sendInvoice}>
+          <Button onClick={sendInvoice} variant="gradient">
             <Send className="h-4 w-4 mr-2" />
             Save & Send
           </Button>

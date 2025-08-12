@@ -14,6 +14,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { invoices_all, clients_all, update_invoice, create_message_log, reminders_by_invoice, update_reminder, settings_one } from "@/data/collections";
 import { useToast } from "@/hooks/use-toast";
+import { useCelebrationContext } from "@/components/CelebrationProvider";
 
 const currency = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
@@ -25,6 +26,7 @@ export default function InvoicesList() {
   const { data: invoices = [] } = useQuery({ queryKey: ["invoices_all"], queryFn: invoices_all });
   const { data: clients = [] } = useQuery({ queryKey: ["clients_all"], queryFn: clients_all });
   const { data: settings } = useQuery({ queryKey: ["settings_one"], queryFn: settings_one });
+  const { celebrate } = useCelebrationContext();
 
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -88,6 +90,7 @@ export default function InvoicesList() {
       setUtrReference("");
       
       toast({ title: "Invoice marked as paid" });
+      celebrate('mark_paid');
     } catch (error) {
       toast({ title: "Error updating invoice", variant: "destructive" });
     }
@@ -135,6 +138,7 @@ Thank you!`;
         queryClient.invalidateQueries({ queryKey: ["message_log_recent"] });
         
         toast({ title: "Reminder sent successfully" });
+        celebrate('reminder_sent');
       } else {
         toast({ title: "No pending reminders for this invoice", variant: "destructive" });
       }

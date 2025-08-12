@@ -17,8 +17,8 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    /* Branding */
-    --primary: 174 100% 33%; /* Teal #00A89D */
+    /* HustleHub Branding */
+    --primary: 174 85% 41%; /* Teal #17B897 */
     --primary-foreground: 210 40% 98%;
 
     --secondary: 210 40% 96%;
@@ -38,21 +38,26 @@ All colors MUST be HSL.
 
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 174 100% 33%;
+    --ring: 174 85% 41%;
 
     --radius: 0.75rem; /* 12px */
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5% 26%;
-    --sidebar-primary: 174 100% 33%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 5% 96%;
-    --sidebar-accent-foreground: 240 6% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 174 100% 33%;
+    /* Brand specific tokens */
+    --brand-dark: 222 47% 11%; /* Ink #0F172A */
+    --brand-gray: 220 13% 41%; /* Gray #64748B */
+    --brand-gradient: linear-gradient(90deg, hsl(174 85% 41%) 0%, hsl(185 100% 42%) 50%, hsl(28 91% 54%) 100%);
+
+    --sidebar-background: 222 47% 11%; /* Dark ink */
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 174 85% 41%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 222 32% 15%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 222 32% 15%;
+    --sidebar-ring: 174 85% 41%;
 
     /* Extras */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(174 100% 40%));
+    --gradient-primary: var(--brand-gradient);
     --shadow-elevated: 0 14px 30px -10px hsl(var(--primary) / 0.25);
   }
 

@@ -19,8 +19,12 @@ export default function Topbar() {
     <header className="h-14 flex items-center border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex items-center gap-3">
         <SidebarTrigger className="ml-0" />
-        <Link to="/" className="flex items-center gap-2">
-          <img src="/placeholder.svg" alt="HustleHub logo" className="h-7 w-7" />
+        <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <img 
+            src="/lovable-uploads/15da6b2f-c805-40f3-9516-1f39b35b194a.png" 
+            alt="HustleHub" 
+            className="h-8 w-8 object-contain"
+          />
           <span className="font-semibold">HustleHub</span>
           <span className="text-muted-foreground hidden sm:inline">— Your UPI-first Hustle-HQ</span>
         </Link>
