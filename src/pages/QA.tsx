@@ -30,7 +30,7 @@ import type { QATestResult } from '@/qa/localStorage';
 import type { TestRunSummary } from '@/qa/testRunner';
 
 // Import Supabase and collections for demo data
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import * as collections from '@/data/collections';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -72,17 +72,17 @@ export default function QA() {
 
   const loadDemoDataCounts = async () => {
     try {
-      const sb = supabase();
+      // Use the correct supabase import
       
       // Count QA entities
       const [clientsRes, projectsRes, invoicesRes, itemsRes, tasksRes, remindersRes, logsRes] = await Promise.all([
-        sb.from('clients').select('id', { count: 'exact' }).or('name.eq.Acme Studios,name.eq.Bright Ideas,name.eq.Creative Minds,name.eq.QA Co'),
-        sb.from('projects').select('id', { count: 'exact' }).eq('name', 'Website Revamp'),
-        sb.from('invoices').select('id', { count: 'exact' }).like('invoice_number', 'QA-%'),
-        sb.from('invoice_items').select('id', { count: 'exact' }).in('title', ['UI Design Sprint', 'Brand Kit', 'Content Pack']),
-        sb.from('tasks').select('id', { count: 'exact' }).or('title.eq.Send assets to Acme,title.eq.Bright Ideas review call,title.eq.Portfolio refresh'),
-        sb.from('reminders').select('id', { count: 'exact' }).eq('status', 'pending'),
-        sb.from('message_log').select('id', { count: 'exact' }).eq('related_type', 'qa').limit(10)
+        supabase.from('clients').select('id', { count: 'exact' }).or('name.eq.Acme Studios,name.eq.Bright Ideas,name.eq.Creative Minds,name.eq.QA Co'),
+        supabase.from('projects').select('id', { count: 'exact' }).eq('name', 'Website Revamp'),
+        supabase.from('invoices').select('id', { count: 'exact' }).like('invoice_number', 'QA-%'),
+        supabase.from('invoice_items').select('id', { count: 'exact' }).in('title', ['UI Design Sprint', 'Brand Kit', 'Content Pack']),
+        supabase.from('tasks').select('id', { count: 'exact' }).or('title.eq.Send assets to Acme,title.eq.Bright Ideas review call,title.eq.Portfolio refresh'),
+        supabase.from('reminders').select('id', { count: 'exact' }).eq('status', 'pending'),
+        supabase.from('message_log').select('id', { count: 'exact' }).eq('related_type', 'qa').limit(10)
       ]);
       
       setDemoDataCounts({
@@ -234,19 +234,18 @@ export default function QA() {
     toast({ title: "🚀 Starting demo data population..." });
     
     try {
-      const sb = supabase();
       let createdCounts = { settings: 0, clients: 0, projects: 0, invoices: 0, items: 0, reminders: 0, tasks: 0, logs: 0 };
       
       // Test connection first
-      const { error: testError } = await sb.from('clients').select('count', { count: 'exact' }).limit(1);
+      const { error: testError } = await supabase.from('clients').select('count', { count: 'exact' }).limit(1);
       if (testError) {
         throw new Error(`Database connection failed: ${testError.message}`);
       }
       
       // 1. Ensure settings exist (idempotent)
-      const { data: existingSettings } = await sb.from('settings').select('*').limit(1).maybeSingle();
+      const { data: existingSettings } = await supabase.from('settings').select('*').limit(1).maybeSingle();
       if (!existingSettings) {
-        const { error: settingsError } = await sb.from('settings').insert({
+        const { error: settingsError } = await supabase.from('settings').insert({
           creator_display_name: 'HustleHub Demo',
           upi_vpa: 'demo@upi',
           default_gst_percent: 18,
@@ -266,9 +265,9 @@ export default function QA() {
 
       const clients = [];
       for (const clientData of clientsToCreate) {
-        const { data: existing } = await sb.from('clients').select('*').eq('name', clientData.name).maybeSingle();
+        const { data: existing } = await supabase.from('clients').select('*').eq('name', clientData.name).maybeSingle();
         if (!existing) {
-          const { data: newClient, error } = await sb.from('clients').insert(clientData).select('*').single();
+          const { data: newClient, error } = await supabase.from('clients').insert(clientData).select('*').single();
           if (error) throw new Error(`Client creation failed for ${clientData.name}: ${error.message}`);
           clients.push(newClient);
           createdCounts.clients++;
@@ -282,9 +281,9 @@ export default function QA() {
       // 3. Create project for Acme Studios (idempotent)
       let project = null;
       if (acmeClient) {
-        const { data: existingProject } = await sb.from('projects').select('*').eq('name', 'Website Revamp').eq('client_id', acmeClient.id).maybeSingle();
+        const { data: existingProject } = await supabase.from('projects').select('*').eq('name', 'Website Revamp').eq('client_id', acmeClient.id).maybeSingle();
         if (!existingProject) {
-          const { data: newProject, error } = await sb.from('projects').insert({
+          const { data: newProject, error } = await supabase.from('projects').insert({
             client_id: acmeClient.id,
             name: 'Website Revamp',
             is_billable: true
@@ -308,7 +307,7 @@ export default function QA() {
           subtotal: 25000,
           gst_amount: 4500,
           total_amount: 29500,
-          status: 'paid',
+          status: 'paid' as const,
           paid_date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           utr_reference: 'UTR-QA-1'
         },
@@ -321,7 +320,7 @@ export default function QA() {
           subtotal: 18000,
           gst_amount: 3240,
           total_amount: 21240,
-          status: 'sent'
+          status: 'sent' as const
         },
         {
           invoice_number: 'QA-2025-1003',
@@ -332,15 +331,15 @@ export default function QA() {
           subtotal: 10000,
           gst_amount: 1800,
           total_amount: 11800,
-          status: 'overdue'
+          status: 'overdue' as const
         }
       ];
 
       const invoices = [];
       for (const invoiceData of invoicesToCreate) {
-        const { data: existing } = await sb.from('invoices').select('*').eq('invoice_number', invoiceData.invoice_number).maybeSingle();
+        const { data: existing } = await supabase.from('invoices').select('*').eq('invoice_number', invoiceData.invoice_number).maybeSingle();
         if (!existing && invoiceData.client_id) {
-          const { data: newInvoice, error } = await sb.from('invoices').insert(invoiceData).select('*').single();
+          const { data: newInvoice, error } = await supabase.from('invoices').insert(invoiceData).select('*').single();
           if (error) throw new Error(`Invoice creation failed for ${invoiceData.invoice_number}: ${error.message}`);
           invoices.push(newInvoice);
           createdCounts.invoices++;
@@ -360,9 +359,9 @@ export default function QA() {
         const invoice = invoices[i];
         const itemData = itemsToCreate[i];
         
-        const { data: existingItem } = await sb.from('invoice_items').select('*').eq('invoice_id', invoice.id).eq('title', itemData.title).maybeSingle();
+        const { data: existingItem } = await supabase.from('invoice_items').select('*').eq('invoice_id', invoice.id).eq('title', itemData.title).maybeSingle();
         if (!existingItem) {
-          const { error } = await sb.from('invoice_items').insert({
+          const { error } = await supabase.from('invoice_items').insert({
             invoice_id: invoice.id,
             title: itemData.title,
             qty: 1,
@@ -383,14 +382,14 @@ export default function QA() {
         
         for (const reminderDate of reminderDates) {
           const scheduledAt = reminderDate.toISOString();
-          const { data: existing } = await sb.from('reminders').select('*')
+          const { data: existing } = await supabase.from('reminders').select('*')
             .eq('invoice_id', invoice.id)
             .gte('scheduled_at', new Date(reminderDate.getTime() - 2 * 60 * 60 * 1000).toISOString())
             .lte('scheduled_at', new Date(reminderDate.getTime() + 2 * 60 * 60 * 1000).toISOString())
             .maybeSingle();
             
           if (!existing) {
-            const { error } = await sb.from('reminders').insert({
+            const { error } = await supabase.from('reminders').insert({
               invoice_id: invoice.id,
               scheduled_at: scheduledAt,
               channel: 'whatsapp',
@@ -404,15 +403,15 @@ export default function QA() {
 
       // 7. Create demo tasks (idempotent by title)
       const tasksToCreate = [
-        { title: 'Send assets to Acme', due_date: new Date().toISOString().split('T')[0], is_billable: true, status: 'open' },
-        { title: 'Bright Ideas review call', due_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], is_billable: false, status: 'open' },
-        { title: 'Portfolio refresh', due_date: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], is_billable: false, status: 'open' }
+        { title: 'Send assets to Acme', due_date: new Date().toISOString().split('T')[0], is_billable: true, status: 'open' as const },
+        { title: 'Bright Ideas review call', due_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], is_billable: false, status: 'open' as const },
+        { title: 'Portfolio refresh', due_date: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], is_billable: false, status: 'open' as const }
       ];
 
       for (const taskData of tasksToCreate) {
-        const { data: existing } = await sb.from('tasks').select('*').eq('title', taskData.title).maybeSingle();
+        const { data: existing } = await supabase.from('tasks').select('*').eq('title', taskData.title).maybeSingle();
         if (!existing) {
-          const { data: newTask, error } = await sb.from('tasks').insert({
+          const { data: newTask, error } = await supabase.from('tasks').insert({
             ...taskData,
             project_id: project?.id || null
           }).select('*').single();
@@ -420,7 +419,7 @@ export default function QA() {
           createdCounts.tasks++;
           
           // Log task creation
-          await sb.from('message_log').insert({
+          await supabase.from('message_log').insert({
             related_type: 'task',
             related_id: newTask.id,
             channel: 'whatsapp',
@@ -434,16 +433,15 @@ export default function QA() {
 
       // 8. Create additional message log entries
       const logEntries = [
-        { related_type: 'invoice', related_id: invoices[0]?.id, template_used: 'invoice_draft', outcome: 'ok', notes: 'QA seeded invoice draft' },
-        { related_type: 'invoice', related_id: invoices[1]?.id, template_used: 'invoice_sent', outcome: 'ok', notes: 'QA seeded invoice sent' },
-        { related_type: 'invoice', related_id: invoices[0]?.id, template_used: 'invoice_paid', outcome: 'ok', notes: 'QA seeded invoice paid' },
-        { related_type: 'reminder', template_used: 'reminder_sent', outcome: 'ok', notes: 'QA seeded reminder sent' }
+        { related_type: 'invoice' as const, related_id: invoices[0]?.id, template_used: 'invoice_draft', outcome: 'ok' },
+        { related_type: 'invoice' as const, related_id: invoices[1]?.id, template_used: 'invoice_sent', outcome: 'ok' },
+        { related_type: 'invoice' as const, related_id: invoices[0]?.id, template_used: 'invoice_paid', outcome: 'ok' }
       ];
 
       for (const logData of logEntries.filter(log => log.related_id)) {
-        await sb.from('message_log').insert({
+        await supabase.from('message_log').insert({
           ...logData,
-          channel: 'whatsapp'
+          channel: 'whatsapp' as const
         });
         createdCounts.logs++;
       }
@@ -483,16 +481,15 @@ export default function QA() {
     toast({ title: "🧹 Starting demo data cleanup..." });
     
     try {
-      const sb = supabase();
       let deletedCounts = { invoices: 0, items: 0, reminders: 0, tasks: 0, clients: 0, logs: 0 };
       
       // 1. Get QA invoice IDs first (for cascade operations)
-      const { data: qaInvoices } = await sb.from('invoices').select('id').ilike('invoice_number', 'QA-%');
+      const { data: qaInvoices } = await supabase.from('invoices').select('id').ilike('invoice_number', 'QA-%');
       const qaInvoiceIds = qaInvoices?.map(inv => inv.id) || [];
       
       // 2. Delete reminders for QA invoices
       if (qaInvoiceIds.length > 0) {
-        const { count: reminderCount } = await sb.from('reminders')
+        const { count: reminderCount } = await supabase.from('reminders')
           .delete({ count: 'exact' })
           .in('invoice_id', qaInvoiceIds);
         deletedCounts.reminders = reminderCount || 0;
@@ -500,35 +497,35 @@ export default function QA() {
       
       // 3. Delete invoice items for QA invoices  
       if (qaInvoiceIds.length > 0) {
-        const { count: itemCount } = await sb.from('invoice_items')
+        const { count: itemCount } = await supabase.from('invoice_items')
           .delete({ count: 'exact' })
           .in('invoice_id', qaInvoiceIds);
         deletedCounts.items = itemCount || 0;
       }
       
       // 4. Delete QA invoices
-      const { count: invoiceCount } = await sb.from('invoices')
+      const { count: invoiceCount } = await supabase.from('invoices')
         .delete({ count: 'exact' })
         .ilike('invoice_number', 'QA-%');
       deletedCounts.invoices = invoiceCount || 0;
       
       // 5. Delete specific QA tasks (by title)
       const qaTaskTitles = ['Send assets to Acme', 'Bright Ideas review call', 'Portfolio refresh'];
-      const { count: taskCount } = await sb.from('tasks')
+      const { count: taskCount } = await supabase.from('tasks')
         .delete({ count: 'exact' })
         .in('title', qaTaskTitles);
       deletedCounts.tasks = taskCount || 0;
       
       // 6. Delete QA Co client only (preserve Acme, Bright Ideas, Creative Minds)
-      const { count: clientCount } = await sb.from('clients')
+      const { count: clientCount } = await supabase.from('clients')
         .delete({ count: 'exact' })
         .eq('name', 'QA Co');
       deletedCounts.clients = clientCount || 0;
       
       // 7. Delete QA-related message logs
-      const { count: logCount } = await sb.from('message_log')
+      const { count: logCount } = await supabase.from('message_log')
         .delete({ count: 'exact' })
-        .or('notes.ilike.%QA%,template_used.in.(task_created),outcome.eq.ok');
+        .or('template_used.eq.task_created,template_used.eq.invoice_draft,template_used.eq.invoice_sent');
       deletedCounts.logs = logCount || 0;
 
       // Invalidate all React Query caches

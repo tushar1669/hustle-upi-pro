@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { QRCodeSVG } from "qrcode.react";
 import { useMemo, useState, useEffect } from "react";
-import { Plus, Trash2, FileText, Send } from "lucide-react";
+import { Plus, Trash2, FileText, Send, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { 
@@ -27,6 +27,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import AddClientModal from "@/components/AddClientModal";
 import AddProjectModal from "@/components/AddProjectModal";
+import { CACHE_KEYS, invalidateInvoiceCaches } from "@/hooks/useCache";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const currency = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
@@ -43,10 +45,22 @@ export default function CreateInvoice() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: settings } = useQuery({ queryKey: ["settings_one"], queryFn: settings_one });
-  const { data: clients = [], refetch: refetchClients } = useQuery({ queryKey: ["clients_all"], queryFn: clients_all });
-  const { data: projects = [], refetch: refetchProjects } = useQuery({ queryKey: ["projects_all"], queryFn: projects_all });
-  const { data: invoices = [] } = useQuery({ queryKey: ["invoices_all"], queryFn: invoices_all });
+  const { data: settings, isLoading: settingsLoading, error: settingsError } = useQuery({ 
+    queryKey: CACHE_KEYS.SETTINGS, 
+    queryFn: settings_one 
+  });
+  const { data: clients = [], refetch: refetchClients } = useQuery({ 
+    queryKey: CACHE_KEYS.CLIENTS, 
+    queryFn: clients_all 
+  });
+  const { data: projects = [], refetch: refetchProjects } = useQuery({ 
+    queryKey: CACHE_KEYS.PROJECTS, 
+    queryFn: projects_all 
+  });
+  const { data: invoices = [] } = useQuery({ 
+    queryKey: CACHE_KEYS.INVOICES, 
+    queryFn: invoices_all 
+  });
 
   const [clientId, setClientId] = useState("");
   const [projectId, setProjectId] = useState("");
@@ -131,13 +145,13 @@ export default function CreateInvoice() {
   const handleClientCreated = (newClientId: string) => {
     refetchClients();
     setClientId(newClientId);
-    queryClient.invalidateQueries({ queryKey: ["clients_all"] });
+    queryClient.invalidateQueries({ queryKey: CACHE_KEYS.CLIENTS });
   };
 
   const handleProjectCreated = (newProjectId: string) => {
     refetchProjects();
     setProjectId(newProjectId);
-    queryClient.invalidateQueries({ queryKey: ["projects_all"] });
+    queryClient.invalidateQueries({ queryKey: CACHE_KEYS.PROJECTS });
   };
 
   const saveDraft = async () => {
@@ -181,7 +195,7 @@ export default function CreateInvoice() {
         outcome: "saved"
       });
 
-      queryClient.invalidateQueries({ queryKey: ["invoices_all"] });
+      await invalidateInvoiceCaches(queryClient);
       toast({ title: "Draft saved successfully" });
       navigate("/invoices");
     } catch (error) {
@@ -257,10 +271,9 @@ export default function CreateInvoice() {
         outcome: "queued"
       });
 
-      queryClient.invalidateQueries({ queryKey: ["invoices_all"] });
-      queryClient.invalidateQueries({ queryKey: ["reminders"] });
-      queryClient.invalidateQueries({ queryKey: ["message_log_recent"] });
-      queryClient.invalidateQueries({ queryKey: ["v_dashboard_metrics"] });
+      await invalidateInvoiceCaches(queryClient);
+      queryClient.invalidateQueries({ queryKey: CACHE_KEYS.REMINDERS });
+      queryClient.invalidateQueries({ queryKey: CACHE_KEYS.MESSAGES });
       toast({ title: "Invoice sent successfully" });
       navigate("/invoices");
     } catch (error) {
@@ -268,8 +281,46 @@ export default function CreateInvoice() {
     }
   };
 
-  if (!settings) {
-    return <div>Loading...</div>;
+  if (settingsLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-96">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Loading invoice settings...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (settingsError || !settings) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold">Create Invoice</h1>
+          <Button variant="outline" onClick={() => navigate("/invoices")}>Cancel</Button>
+        </div>
+        
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Unable to load invoice settings. Please ensure demo data is populated first by visiting the{" "}
+            <Button variant="link" className="h-auto p-0" onClick={() => navigate("/qa")}>
+              QA page
+            </Button>{" "}
+            and clicking "Populate Demo Data".
+          </AlertDescription>
+        </Alert>
+        
+        {clients.length === 0 && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              No clients found. Demo data needs to be populated to create invoices.
+            </AlertDescription>
+          </Alert>
+        )}
+      </div>
+    );
   }
 
   return (

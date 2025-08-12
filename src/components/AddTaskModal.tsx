@@ -9,6 +9,7 @@ import { useState } from "react";
 import { create_task, create_message_log, projects_all } from "@/data/collections";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
+import { CACHE_KEYS } from "@/hooks/useCache";
 
 interface AddTaskModalProps {
   isOpen: boolean;
@@ -25,7 +26,7 @@ export default function AddTaskModal({ isOpen, onClose, onSuccess }: AddTaskModa
     notes: ""
   });
   const { toast } = useToast();
-  const { data: projects = [] } = useQuery({ queryKey: ["projects_all"], queryFn: projects_all });
+  const { data: projects = [] } = useQuery({ queryKey: CACHE_KEYS.PROJECTS, queryFn: projects_all });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

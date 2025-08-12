@@ -6,6 +6,9 @@ import { Plus, FileText, Users, CheckSquare, DollarSign } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { clients_all, tasks_all, invoices_all, v_dashboard_metrics, update_task, create_message_log } from "@/data/collections";
 import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
+import AddTaskModal from "@/components/AddTaskModal";
+import { CACHE_KEYS, invalidateTaskCaches } from "@/hooks/useCache";
 
 const currency = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
@@ -13,24 +16,25 @@ export default function QuickActionsWidget() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
 
   const { data: clients = [], isLoading: clientsLoading } = useQuery({ 
-    queryKey: ["clients_all"], 
+    queryKey: CACHE_KEYS.CLIENTS, 
     queryFn: clients_all 
   });
   
   const { data: tasks = [], isLoading: tasksLoading } = useQuery({ 
-    queryKey: ["tasks_all"], 
+    queryKey: CACHE_KEYS.TASKS, 
     queryFn: tasks_all 
   });
   
   const { data: invoices = [], isLoading: invoicesLoading } = useQuery({ 
-    queryKey: ["invoices_all"], 
+    queryKey: CACHE_KEYS.INVOICES, 
     queryFn: invoices_all 
   });
   
   const { data: dashboardMetrics } = useQuery({ 
-    queryKey: ["v_dashboard_metrics"], 
+    queryKey: CACHE_KEYS.DASHBOARD, 
     queryFn: v_dashboard_metrics 
   });
 
@@ -63,12 +67,19 @@ export default function QuickActionsWidget() {
         template_used: 'task_completed',
         outcome: 'ok'
       });
-      queryClient.invalidateQueries({ queryKey: ["tasks_all"] });
-      queryClient.invalidateQueries({ queryKey: ["v_dashboard_metrics"] });
+      await invalidateTaskCaches(queryClient);
       toast({ title: "Task marked as done" });
     } catch (error) {
       toast({ title: "Error updating task", variant: "destructive" });
     }
+  };
+
+  const handleAddTask = () => {
+    setIsAddTaskModalOpen(true);
+  };
+
+  const handleTaskCreated = async () => {
+    await invalidateTaskCaches(queryClient);
   };
 
   const handleAddClient = () => {
@@ -94,7 +105,7 @@ export default function QuickActionsWidget() {
             <FileText className="h-4 w-4 mr-2" />
             New Invoice
           </Button>
-          <Button variant="secondary" onClick={() => navigate("/tasks")} className="h-12">
+          <Button variant="secondary" onClick={handleAddTask} className="h-12">
             <CheckSquare className="h-4 w-4 mr-2" />
             Add Task
           </Button>
@@ -240,6 +251,12 @@ export default function QuickActionsWidget() {
           </div>
         </div>
       </CardContent>
+      
+      <AddTaskModal 
+        isOpen={isAddTaskModalOpen}
+        onClose={() => setIsAddTaskModalOpen(false)}
+        onSuccess={handleTaskCreated}
+      />
     </Card>
   );
 }
