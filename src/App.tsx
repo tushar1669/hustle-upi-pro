@@ -8,9 +8,10 @@ import NotFound from "./pages/NotFound";
 import AppLayout from "@/components/layout/AppLayout";
 import InvoicesList from "@/pages/invoices/InvoicesList";
 import CreateInvoice from "@/pages/invoices/CreateInvoice";
-import Tasks from "@/pages/Tasks";
-import Clients from "@/pages/Clients";
-import FollowUps from "@/pages/FollowUps";
+import Tasks from "./pages/Tasks";
+import Clients from "./pages/Clients";
+import FollowUps from "./pages/FollowUps";
+import QA from "./pages/QA";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +39,8 @@ const App = () => (
             <Route path="follow-ups" element={<FollowUps />} />
             <Route path="*" element={<NotFound />} />
           </Route>
+          {/* QA route - standalone, not in main layout */}
+          <Route path="/qa" element={<QA />} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>
