@@ -94,7 +94,7 @@ export default function QA() {
       const [clientsRes, projectsRes, invoicesRes, itemsRes, tasksRes, remindersRes, logsRes] = await Promise.all([
         supabase.from('clients').select('id', { count: 'exact' }).or('name.eq.Acme Studios,name.eq.Bright Ideas,name.eq.Creative Minds,name.eq.QA Co'),
         supabase.from('projects').select('id', { count: 'exact' }).eq('name', 'Website Revamp'),
-        supabase.from('invoices').select('id', { count: 'exact' }).like('invoice_number', 'QA-%'),
+        supabase.from('invoices').select('id', { count: 'exact' }).or('invoice_number.like.QA-%,invoice_number.like.HH-%'),
         supabase.from('invoice_items').select('id', { count: 'exact' }).in('title', ['UI Design Sprint', 'Brand Kit', 'Content Pack']),
         supabase.from('tasks').select('id', { count: 'exact' }).or('title.eq.Send assets to Acme,title.eq.Bright Ideas review call,title.eq.Portfolio refresh'),
         supabase.from('reminders').select('id', { count: 'exact' }).eq('status', 'pending'),
@@ -634,7 +634,7 @@ export default function QA() {
       let deletedCounts = { invoices: 0, items: 0, reminders: 0, tasks: 0, clients: 0, logs: 0 };
       
       // 1. Get QA invoice IDs first (for cascade operations)
-      const { data: qaInvoices } = await supabase.from('invoices').select('id').ilike('invoice_number', 'QA-%');
+      const { data: qaInvoices } = await supabase.from('invoices').select('id').or('invoice_number.like.QA-%,invoice_number.like.HH-%');
       const qaInvoiceIds = qaInvoices?.map(inv => inv.id) || [];
       
       // 2. Delete reminders for QA invoices
@@ -653,10 +653,10 @@ export default function QA() {
         deletedCounts.items = itemCount || 0;
       }
       
-      // 4. Delete QA invoices
+      // 4. Delete invoices with QA- or HH- prefix (both old and new format)
       const { count: invoiceCount } = await supabase.from('invoices')
         .delete({ count: 'exact' })
-        .ilike('invoice_number', 'QA-%');
+        .or('invoice_number.like.QA-%,invoice_number.like.HH-%');
       deletedCounts.invoices = invoiceCount || 0;
       
       // 5. Delete specific QA tasks (by title)
