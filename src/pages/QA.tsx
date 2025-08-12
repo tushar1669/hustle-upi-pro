@@ -22,9 +22,12 @@ import {
   Clock,
   Wrench
 } from 'lucide-react';
-import { qaTestRunner, type TestRunSummary } from '@/qa/testRunner';
+
+// Import QA system components
+import { qaTestRunner } from '@/qa/testRunner';
 import { QA_TESTS } from '@/qa/tests';
 import type { QATestResult } from '@/qa/localStorage';
+import type { TestRunSummary } from '@/qa/testRunner';
 
 export default function QA() {
   const [isRunning, setIsRunning] = useState(false);
