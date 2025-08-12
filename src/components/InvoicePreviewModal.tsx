@@ -53,7 +53,7 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoice }: Invoic
           </head>
           <body>
             <div class="invoice-header">
-              ${settings?.logo_url ? `<img src="${settings.logo_url}" alt="Logo" class="invoice-logo" />` : ''}
+              ${(settings as any)?.logo_url ? `<img src="${(settings as any).logo_url}" alt="Logo" class="invoice-logo" />` : ''}
               <div class="invoice-title">INVOICE</div>
               <div><strong>Invoice #:</strong> ${invoice.invoice_number}</div>
               <div><strong>Date:</strong> ${new Date(invoice.issue_date).toLocaleDateString()}</div>
@@ -125,9 +125,9 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoice }: Invoic
         <div className="space-y-6 print:p-8">
           {/* Invoice Header */}
           <div className="border-b-2 border-primary pb-6">
-            {settings?.logo_url && (
+            {(settings as any)?.logo_url && (
               <img 
-                src={settings.logo_url} 
+                src={(settings as any).logo_url} 
                 alt="Company Logo" 
                 className="h-16 mb-4"
               />
