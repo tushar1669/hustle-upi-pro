@@ -142,10 +142,22 @@ export default function CreateInvoice() {
     setProjectId(""); // Reset project when client changes
   };
 
-  const handleClientCreated = (newClientId: string) => {
-    refetchClients();
+  const handleClientCreated = async (newClientId: string) => {
+    // Set client immediately for UI responsiveness
     setClientId(newClientId);
-    queryClient.invalidateQueries({ queryKey: CACHE_KEYS.CLIENTS });
+    setProjectId(""); // Reset project when client changes
+    
+    // Trigger background refetch without awaiting
+    refetchClients();
+    
+    // Invalidate related caches
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: CACHE_KEYS.CLIENTS }),
+      queryClient.invalidateQueries({ queryKey: CACHE_KEYS.PROJECTS }),
+      queryClient.invalidateQueries({ queryKey: CACHE_KEYS.DASHBOARD })
+    ]);
+    
+    toast({ title: "Client created and selected" });
   };
 
   const handleProjectCreated = (newProjectId: string) => {
@@ -157,6 +169,16 @@ export default function CreateInvoice() {
   const saveDraft = async () => {
     if (!clientId) {
       toast({ title: "Please select a client", variant: "destructive" });
+      return;
+    }
+    
+    if (!dueDate) {
+      toast({ title: "Please set a due date", variant: "destructive" });
+      return;
+    }
+    
+    if (lineItems.length === 0 || lineItems.some(item => !item.title.trim())) {
+      toast({ title: "Please add at least one line item with a title", variant: "destructive" });
       return;
     }
     
@@ -195,17 +217,33 @@ export default function CreateInvoice() {
         outcome: "saved"
       });
 
-      await invalidateInvoiceCaches(queryClient);
+      await Promise.all([
+        invalidateInvoiceCaches(queryClient),
+        queryClient.invalidateQueries({ queryKey: CACHE_KEYS.DASHBOARD }),
+        queryClient.invalidateQueries({ queryKey: CACHE_KEYS.MESSAGES })
+      ]);
       toast({ title: "Draft saved successfully" });
       navigate("/invoices");
     } catch (error) {
-      toast({ title: "Error saving draft", variant: "destructive" });
+      console.error('Save draft error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast({ title: `Error saving draft: ${errorMessage}`, variant: "destructive" });
     }
   };
 
   const sendInvoice = async () => {
     if (!clientId) {
       toast({ title: "Please select a client", variant: "destructive" });
+      return;
+    }
+    
+    if (!dueDate) {
+      toast({ title: "Please set a due date", variant: "destructive" });
+      return;
+    }
+    
+    if (lineItems.length === 0 || lineItems.some(item => !item.title.trim())) {
+      toast({ title: "Please add at least one line item with a title", variant: "destructive" });
       return;
     }
     
@@ -236,11 +274,11 @@ export default function CreateInvoice() {
         });
       }
 
-      // Create reminders
-      const now = new Date();
-      const reminder3Days = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
-      const reminder7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-      const reminder14Days = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+      // Create reminders from issue date
+      const issueDate = new Date();
+      const reminder3Days = new Date(issueDate.getTime() + 3 * 24 * 60 * 60 * 1000);
+      const reminder7Days = new Date(issueDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const reminder14Days = new Date(issueDate.getTime() + 14 * 24 * 60 * 60 * 1000);
 
       await Promise.all([
         create_reminder({
@@ -271,13 +309,18 @@ export default function CreateInvoice() {
         outcome: "queued"
       });
 
-      await invalidateInvoiceCaches(queryClient);
-      queryClient.invalidateQueries({ queryKey: CACHE_KEYS.REMINDERS });
-      queryClient.invalidateQueries({ queryKey: CACHE_KEYS.MESSAGES });
+      await Promise.all([
+        invalidateInvoiceCaches(queryClient),
+        queryClient.invalidateQueries({ queryKey: CACHE_KEYS.REMINDERS }),
+        queryClient.invalidateQueries({ queryKey: CACHE_KEYS.MESSAGES }),
+        queryClient.invalidateQueries({ queryKey: CACHE_KEYS.DASHBOARD })
+      ]);
       toast({ title: "Invoice sent successfully" });
       navigate("/invoices");
     } catch (error) {
-      toast({ title: "Error sending invoice", variant: "destructive" });
+      console.error('Send invoice error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast({ title: `Error sending invoice: ${errorMessage}`, variant: "destructive" });
     }
   };
 

@@ -255,7 +255,7 @@ export default function QA() {
       const { data: qaInvoices, error } = await supabase
         .from('invoices')
         .select('id')
-        .like('invoice_number', 'QA-%');
+        .or('invoice_number.like.QA-%,invoice_number.like.HH-%');
 
       if (error) throw error;
 
@@ -441,9 +441,13 @@ export default function QA() {
       }
 
       // 4. Create QA invoices (idempotent by invoice_number)
+      // Get settings to use correct invoice prefix
+      const { data: settings } = await supabase.from('settings').select('invoice_prefix').limit(1).maybeSingle();
+      const prefix = settings?.invoice_prefix || 'HH';
+      
       const invoicesToCreate = [
         {
-          invoice_number: 'QA-2025-1001',
+          invoice_number: `${prefix}-2025-1001`,
           client_id: acmeClient?.id,
           project_id: project?.id,
           issue_date: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -456,7 +460,7 @@ export default function QA() {
           utr_reference: 'UTR-QA-1'
         },
         {
-          invoice_number: 'QA-2025-1002',
+          invoice_number: `${prefix}-2025-1002`,
           client_id: acmeClient?.id,
           project_id: project?.id,
           issue_date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -467,7 +471,7 @@ export default function QA() {
           status: 'sent' as const
         },
         {
-          invoice_number: 'QA-2025-1003',
+          invoice_number: `${prefix}-2025-1003`,
           client_id: acmeClient?.id,
           project_id: project?.id,
           issue_date: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -518,11 +522,13 @@ export default function QA() {
       }
 
       // 6. Create reminders for sent/overdue invoices (idempotent)
-      const sentInvoice = invoices.find(inv => inv.invoice_number === 'QA-2025-1002');
-      const overdueInvoice = invoices.find(inv => inv.invoice_number === 'QA-2025-1003');
+      const sentInvoice = invoices.find(inv => inv.invoice_number === `${prefix}-2025-1002`);
+      const overdueInvoice = invoices.find(inv => inv.invoice_number === `${prefix}-2025-1003`);
       
       for (const invoice of [sentInvoice, overdueInvoice].filter(Boolean)) {
-        const reminderDates = [3, 7, 14].map(days => new Date(Date.now() + days * 24 * 60 * 60 * 1000));
+        // Fix: Schedule reminders from issue_date, not current time
+        const issueDate = new Date(invoice.issue_date);
+        const reminderDates = [3, 7, 14].map(days => new Date(issueDate.getTime() + days * 24 * 60 * 60 * 1000));
         
         for (const reminderDate of reminderDates) {
           const scheduledAt = reminderDate.toISOString();

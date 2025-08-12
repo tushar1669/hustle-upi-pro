@@ -25,13 +25,27 @@ export default function AddClientModal({ isOpen, onClose, onSuccess }: AddClient
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      if (!formData.name.trim()) {
+        toast({ title: "Client name is required", variant: "destructive" });
+        return;
+      }
+      
       const client = await create_client(formData);
       onSuccess(client.id);
       setFormData({ name: "", whatsapp: "", email: "", gstin: "", upi_vpa: "" });
       onClose();
       toast({ title: "Client created successfully" });
     } catch (error) {
-      toast({ title: "Error creating client", variant: "destructive" });
+      console.error('Client creation error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      if (errorMessage.includes('name')) {
+        toast({ title: "Error: Client name is invalid", variant: "destructive" });
+      } else if (errorMessage.includes('email')) {
+        toast({ title: "Error: Invalid email format", variant: "destructive" });
+      } else {
+        toast({ title: `Error creating client: ${errorMessage}`, variant: "destructive" });
+      }
     }
   };
 
