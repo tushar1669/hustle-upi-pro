@@ -1,6 +1,7 @@
 import { PropsWithChildren } from "react";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { EmailVerificationBanner } from "@/components/auth/EmailVerificationBanner";
 import Topbar from "./Topbar";
 import Footer from "./Footer";
 
@@ -12,7 +13,10 @@ export default function AppLayout({ children }: PropsWithChildren) {
           <AppSidebar />
           <SidebarInset className="flex flex-col flex-1">
             <Topbar />
-            <main className="container py-6 flex-1">{children}</main>
+            <main className="container py-6 flex-1">
+              <EmailVerificationBanner />
+              {children}
+            </main>
             <Footer />
           </SidebarInset>
         </div>

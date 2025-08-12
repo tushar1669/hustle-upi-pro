@@ -22,6 +22,7 @@ export type Database = {
           gstin: string | null
           id: string
           name: string
+          owner_id: string | null
           suggested_hour: string | null
           upi_vpa: string | null
           whatsapp: string | null
@@ -33,6 +34,7 @@ export type Database = {
           gstin?: string | null
           id?: string
           name: string
+          owner_id?: string | null
           suggested_hour?: string | null
           upi_vpa?: string | null
           whatsapp?: string | null
@@ -44,6 +46,7 @@ export type Database = {
           gstin?: string | null
           id?: string
           name?: string
+          owner_id?: string | null
           suggested_hour?: string | null
           upi_vpa?: string | null
           whatsapp?: string | null
@@ -55,6 +58,7 @@ export type Database = {
           amount: number
           id: string
           invoice_id: string
+          owner_id: string | null
           qty: number
           rate: number
           title: string
@@ -63,6 +67,7 @@ export type Database = {
           amount: number
           id?: string
           invoice_id: string
+          owner_id?: string | null
           qty?: number
           rate?: number
           title: string
@@ -71,6 +76,7 @@ export type Database = {
           amount?: number
           id?: string
           invoice_id?: string
+          owner_id?: string | null
           qty?: number
           rate?: number
           title?: string
@@ -94,8 +100,10 @@ export type Database = {
           id: string
           invoice_number: string
           issue_date: string | null
+          owner_id: string | null
           paid_date: string | null
           project_id: string | null
+          share_url: string | null
           status: Database["public"]["Enums"]["invoice_status"]
           subtotal: number
           total_amount: number
@@ -110,8 +118,10 @@ export type Database = {
           id?: string
           invoice_number: string
           issue_date?: string | null
+          owner_id?: string | null
           paid_date?: string | null
           project_id?: string | null
+          share_url?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
           subtotal?: number
           total_amount: number
@@ -126,8 +136,10 @@ export type Database = {
           id?: string
           invoice_number?: string
           issue_date?: string | null
+          owner_id?: string | null
           paid_date?: string | null
           project_id?: string | null
+          share_url?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
           subtotal?: number
           total_amount?: number
@@ -156,6 +168,7 @@ export type Database = {
           channel: Database["public"]["Enums"]["channel_type"] | null
           id: string
           outcome: string | null
+          owner_id: string | null
           related_id: string
           related_type: string
           sent_at: string | null
@@ -165,6 +178,7 @@ export type Database = {
           channel?: Database["public"]["Enums"]["channel_type"] | null
           id?: string
           outcome?: string | null
+          owner_id?: string | null
           related_id: string
           related_type: string
           sent_at?: string | null
@@ -174,6 +188,7 @@ export type Database = {
           channel?: Database["public"]["Enums"]["channel_type"] | null
           id?: string
           outcome?: string | null
+          owner_id?: string | null
           related_id?: string
           related_type?: string
           sent_at?: string | null
@@ -188,6 +203,7 @@ export type Database = {
           id: string
           is_billable: boolean | null
           name: string
+          owner_id: string | null
         }
         Insert: {
           client_id?: string | null
@@ -195,6 +211,7 @@ export type Database = {
           id?: string
           is_billable?: boolean | null
           name: string
+          owner_id?: string | null
         }
         Update: {
           client_id?: string | null
@@ -202,6 +219,7 @@ export type Database = {
           id?: string
           is_billable?: boolean | null
           name?: string
+          owner_id?: string | null
         }
         Relationships: [
           {
@@ -219,6 +237,7 @@ export type Database = {
           created_at: string | null
           id: string
           invoice_id: string
+          owner_id: string | null
           scheduled_at: string
           status: Database["public"]["Enums"]["reminder_status"]
         }
@@ -227,6 +246,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           invoice_id: string
+          owner_id?: string | null
           scheduled_at: string
           status?: Database["public"]["Enums"]["reminder_status"]
         }
@@ -235,6 +255,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           invoice_id?: string
+          owner_id?: string | null
           scheduled_at?: string
           status?: Database["public"]["Enums"]["reminder_status"]
         }
@@ -255,6 +276,8 @@ export type Database = {
           default_gst_percent: number
           id: number
           invoice_prefix: string
+          logo_url: string | null
+          owner_id: string | null
           upi_vpa: string
         }
         Insert: {
@@ -263,6 +286,8 @@ export type Database = {
           default_gst_percent?: number
           id?: never
           invoice_prefix?: string
+          logo_url?: string | null
+          owner_id?: string | null
           upi_vpa?: string
         }
         Update: {
@@ -271,6 +296,8 @@ export type Database = {
           default_gst_percent?: number
           id?: never
           invoice_prefix?: string
+          logo_url?: string | null
+          owner_id?: string | null
           upi_vpa?: string
         }
         Relationships: []
@@ -283,6 +310,7 @@ export type Database = {
           is_billable: boolean | null
           linked_invoice_id: string | null
           notes: string | null
+          owner_id: string | null
           project_id: string | null
           reminder_time: string | null
           status: Database["public"]["Enums"]["task_status"] | null
@@ -295,6 +323,7 @@ export type Database = {
           is_billable?: boolean | null
           linked_invoice_id?: string | null
           notes?: string | null
+          owner_id?: string | null
           project_id?: string | null
           reminder_time?: string | null
           status?: Database["public"]["Enums"]["task_status"] | null
@@ -307,6 +336,7 @@ export type Database = {
           is_billable?: boolean | null
           linked_invoice_id?: string | null
           notes?: string | null
+          owner_id?: string | null
           project_id?: string | null
           reminder_time?: string | null
           status?: Database["public"]["Enums"]["task_status"] | null
