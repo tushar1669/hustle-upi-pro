@@ -21,7 +21,7 @@ export default function Topbar() {
         <SidebarTrigger className="ml-0" />
         <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <img 
-            src="/lovable-uploads/15da6b2f-c805-40f3-9516-1f39b35b194a.png" 
+            src="/lovable-uploads/1c602a73-5932-4be8-b88d-21cc2bb0d3ce.png" 
             alt="HustleHub" 
             className="h-8 w-8 object-contain"
           />

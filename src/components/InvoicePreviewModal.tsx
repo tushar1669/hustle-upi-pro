@@ -53,7 +53,7 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoice }: Invoic
           </head>
           <body>
             <div class="invoice-header">
-              ${(settings as any)?.logo_url ? `<img src="${(settings as any).logo_url}" alt="Logo" class="invoice-logo" />` : ''}
+              ${(settings as any)?.logo_url ? `<img src="${(settings as any).logo_url}" alt="Logo" class="invoice-logo" />` : `<img src="/lovable-uploads/13a7cb4f-ee68-4e41-a34e-1ad7391b1f85.png" alt="HustleHub" class="invoice-logo" />`}
               <div class="invoice-title">INVOICE</div>
               <div><strong>Invoice #:</strong> ${invoice.invoice_number}</div>
               <div><strong>Date:</strong> ${new Date(invoice.issue_date).toLocaleDateString()}</div>
@@ -125,13 +125,13 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoice }: Invoic
         <div className="space-y-6 print:p-8">
           {/* Invoice Header */}
           <div className="border-b-2 border-primary pb-6">
-            {(settings as any)?.logo_url && (
+            <div className="mb-4">
               <img 
-                src={(settings as any).logo_url} 
+                src={(settings as any)?.logo_url || "/lovable-uploads/13a7cb4f-ee68-4e41-a34e-1ad7391b1f85.png"} 
                 alt="Company Logo" 
-                className="h-16 mb-4"
+                className="h-16"
               />
-            )}
+            </div>
             <div className="flex justify-between items-start">
               <div>
                 <h1 className="text-3xl font-bold text-primary">INVOICE</h1>

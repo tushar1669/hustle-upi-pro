@@ -7,6 +7,8 @@ export interface Settings {
   upiVpa: string;
   defaultGst: number;
   invoicePrefix: string;
+  logoUrl?: string;
+  celebrationEnabled?: boolean;
 }
 
 export interface Client {
