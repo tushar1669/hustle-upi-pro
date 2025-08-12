@@ -229,19 +229,41 @@ export default function QA() {
 
   const populateDemoData = async () => {
     setIsPopulating(true);
+    console.log('Starting demo data population...');
     try {
       const sb = supabase();
+      console.log('Supabase client:', sb);
+      
+      // Test connection first
+      const { data: testData, error: testError } = await sb.from('clients').select('count', { count: 'exact' }).limit(1);
+      console.log('Connection test:', { testData, testError });
+      
+      if (testError) {
+        throw new Error(`Database connection failed: ${testError.message}`);
+      }
+      
       const today = new Date().toISOString().split('T')[0];
+      console.log('Today:', today);
       
       // 1. Ensure settings exist
+      console.log('Checking settings...');
       const existingSettings = await collections.settings_one();
+      console.log('Existing settings:', existingSettings);
+      
       if (!existingSettings) {
-        await sb.from('settings').insert({
+        console.log('Creating settings...');
+        const { data: newSettings, error: settingsError } = await sb.from('settings').insert({
           creator_display_name: 'HustleHub Demo',
           upi_vpa: 'demo@upi',
           default_gst_percent: 18,
           invoice_prefix: 'HH'
-        });
+        }).select().single();
+        
+        if (settingsError) {
+          console.error('Settings creation error:', settingsError);
+          throw new Error(`Failed to create settings: ${settingsError.message}`);
+        }
+        console.log('Settings created:', newSettings);
       }
 
       // 2. Create clients (idempotent)
@@ -252,14 +274,31 @@ export default function QA() {
         { name: 'QA Co', whatsapp: '+1234567893', email: 'test@qaco.com', upi_vpa: 'qaco@upi' }
       ];
 
+      console.log('Creating clients...');
       const createdClients = [];
       for (const clientData of clientsToCreate) {
-        const { data: existing } = await sb.from('clients').select('*').eq('name', clientData.name).single();
+        console.log('Checking client:', clientData.name);
+        const { data: existing, error: existingError } = await sb.from('clients').select('*').eq('name', clientData.name).maybeSingle();
+        
+        if (existingError) {
+          console.error('Error checking existing client:', existingError);
+          throw new Error(`Failed to check client ${clientData.name}: ${existingError.message}`);
+        }
+        
         if (!existing) {
-          const { data: newClient } = await sb.from('clients').insert(clientData).select('*').single();
+          console.log('Creating new client:', clientData.name);
+          const { data: newClient, error: clientError } = await sb.from('clients').insert(clientData).select('*').single();
+          
+          if (clientError) {
+            console.error('Client creation error:', clientError);
+            throw new Error(`Failed to create client ${clientData.name}: ${clientError.message}`);
+          }
+          
           createdClients.push(newClient);
+          console.log('Client created:', newClient);
         } else {
           createdClients.push(existing);
+          console.log('Client already exists:', existing);
         }
       }
 
