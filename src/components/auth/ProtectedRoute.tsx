@@ -17,7 +17,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="text-center space-y-4">
           <img 
-            src="/lovable-uploads/13a7cb4f-ee68-4e41-a34e-1ad7391b1f85.png" 
+            src="/assets/Logo_hustlehub.png" 
             alt="HustleHub" 
             className="h-20 w-auto mx-auto"
           />

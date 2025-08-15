@@ -44,30 +44,30 @@ const Index = () => {
       <h1 className="text-2xl font-semibold">Dashboard</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader>
+        <Card className="border-primary/20">
+          <CardHeader className="bg-primary text-primary-foreground">
             <CardTitle>This Month</CardTitle>
           </CardHeader>
-          <CardContent className="flex items-end justify-between">
-            <div className="text-3xl font-bold">{currency(thisMonthPaid)}</div>
-            <Badge variant="secondary">+12% vs last month</Badge>
+          <CardContent className="flex items-end justify-between pt-6">
+            <div className="text-3xl font-bold text-primary">{currency(thisMonthPaid)}</div>
+            <Badge variant="success">+12% vs last month</Badge>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
+        <Card className="border-danger/20">
+          <CardHeader className="bg-danger text-danger-foreground">
             <CardTitle>Overdue</CardTitle>
           </CardHeader>
-          <CardContent className="flex items-end justify-between">
-            <div className="text-3xl font-bold">{currency(overdueAmount)}</div>
-            <Badge variant="destructive">{overdueCount} invoices</Badge>
+          <CardContent className="flex items-end justify-between pt-6">
+            <div className="text-3xl font-bold text-danger">{currency(overdueAmount)}</div>
+            <Badge variant="danger">{overdueCount} invoices</Badge>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
+        <Card className="border-accent/20">
+          <CardHeader className="bg-accent text-accent-foreground">
             <CardTitle>Tasks Due in 7d</CardTitle>
           </CardHeader>
-          <CardContent className="flex items-end justify-between">
-            <div className="text-3xl font-bold">{tasksDue7}</div>
+          <CardContent className="flex items-end justify-between pt-6">
+            <div className="text-3xl font-bold text-accent">{tasksDue7}</div>
             <div className="text-sm text-muted-foreground">Upcoming</div>
           </CardContent>
         </Card>
@@ -104,7 +104,7 @@ const Index = () => {
                 {dueToday.map((t) => (
                   <div key={t.id} className="flex items-center justify-between">
                     <div className="font-medium">{t.title}</div>
-                    <Badge onClick={() => handleMarkDone(t.id)}>Mark Done</Badge>
+                    <Badge variant="success" className="cursor-pointer" onClick={() => handleMarkDone(t.id)}>Mark Done</Badge>
                   </div>
                 ))}
                 {dueToday.length === 0 && <div className="text-sm text-muted-foreground">No items today.</div>}
@@ -114,7 +114,7 @@ const Index = () => {
                 {overdueTasks.map((t) => (
                   <div key={t.id} className="flex items-center justify-between">
                     <div className="font-medium">{t.title}</div>
-                    <Badge variant="destructive">Send Reminder</Badge>
+                    <Badge variant="warning" className="cursor-pointer">Send Reminder</Badge>
                   </div>
                 ))}
                 {overdueTasks.length === 0 && <div className="text-sm text-muted-foreground">All clear.</div>}

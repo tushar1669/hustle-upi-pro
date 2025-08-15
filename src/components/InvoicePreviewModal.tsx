@@ -53,7 +53,7 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoice }: Invoic
           </head>
           <body>
             <div class="invoice-header">
-              ${(settings as any)?.logo_url ? `<img src="${(settings as any).logo_url}" alt="Logo" class="invoice-logo" />` : `<img src="/lovable-uploads/13a7cb4f-ee68-4e41-a34e-1ad7391b1f85.png" alt="HustleHub" class="invoice-logo" />`}
+              ${(settings as any)?.logo_url ? `<img src="${(settings as any).logo_url}" alt="Logo" class="invoice-logo" />` : `<img src="/assets/Logo_hustlehub.png" alt="HustleHub" class="invoice-logo" />`}
               <div class="invoice-title">INVOICE</div>
               <div><strong>Invoice #:</strong> ${invoice.invoice_number}</div>
               <div><strong>Date:</strong> ${new Date(invoice.issue_date).toLocaleDateString()}</div>
@@ -127,7 +127,7 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoice }: Invoic
           <div className="border-b-2 border-primary pb-6">
             <div className="mb-4">
               <img 
-                src={(settings as any)?.logo_url || "/lovable-uploads/13a7cb4f-ee68-4e41-a34e-1ad7391b1f85.png"} 
+                src={(settings as any)?.logo_url || "/assets/Logo_hustlehub.png"} 
                 alt="Company Logo" 
                 className="h-16"
               />

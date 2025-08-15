@@ -121,7 +121,7 @@ export default function ResetPassword() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <img 
-            src="/lovable-uploads/13a7cb4f-ee68-4e41-a34e-1ad7391b1f85.png" 
+            src="/assets/Logo_hustlehub.png" 
             alt="HustleHub" 
             className="h-16 w-auto mx-auto mb-4"
           />
