@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { FilePlus2, Home, ListChecks, Users, RefreshCw, FileText } from "lucide-react";
+import { Home, Users, FolderKanban, ListChecks, FileText, Target, Settings, FilePlus2 } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -14,11 +14,13 @@ import {
 
 const items = [
   { title: "Dashboard", url: "/", icon: Home },
+  { title: "Clients", url: "/clients", icon: Users },
+  { title: "Projects", url: "/projects", icon: FolderKanban },
+  { title: "Tasks", url: "/tasks", icon: ListChecks },
   { title: "Invoices", url: "/invoices", icon: FileText },
   { title: "Create Invoice", url: "/invoices/new", icon: FilePlus2 },
-  { title: "Tasks", url: "/tasks", icon: ListChecks },
-  { title: "Clients", url: "/clients", icon: Users },
-  { title: "Follow-ups", url: "/follow-ups", icon: RefreshCw },
+  { title: "Savings Goals", url: "/savings", icon: Target },
+  { title: "Settings", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
@@ -28,21 +30,23 @@ export function AppSidebar() {
   const currentPath = location.pathname;
 
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
-    isActive ? "bg-sidebar-accent text-primary font-medium" : "hover:bg-sidebar-accent";
+    isActive 
+      ? "bg-primary/10 text-primary font-medium border-r-2 border-r-primary" 
+      : "hover:bg-sidebar-accent/50 hover:text-foreground transition-colors";
 
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-primary font-semibold">HustleHub</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} end className={getNavCls}>
-                      <item.icon className="mr-2 h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
+                      <item.icon className="mr-3 h-5 w-5" />
+                      {!collapsed && <span className="font-medium">{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

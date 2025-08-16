@@ -12,7 +12,9 @@ import InvoicesList from "@/pages/invoices/InvoicesList";
 import CreateInvoice from "@/pages/invoices/CreateInvoice";
 import Tasks from "./pages/Tasks";
 import Clients from "./pages/Clients";
+import Projects from "./pages/Projects";
 import FollowUps from "./pages/FollowUps";
+import SavingsGoals from "./pages/SavingsGoals";
 import Settings from "./pages/Settings";
 import QA from "./pages/QA";
 import SignIn from "./pages/auth/SignIn";
@@ -53,7 +55,9 @@ const App = () => (
               <Route path="invoices/new" element={<CreateInvoice />} />
               <Route path="tasks" element={<Tasks />} />
               <Route path="clients" element={<Clients />} />
+              <Route path="projects" element={<Projects />} />
               <Route path="follow-ups" element={<FollowUps />} />
+              <Route path="savings" element={<SavingsGoals />} />
               <Route path="settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Route>
