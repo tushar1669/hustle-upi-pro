@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { X, Download, Printer } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { settings_one, clients_all, items_by_invoice } from "@/data/collections";
+import { settings_one, clients_all, client_detail, items_by_invoice } from "@/data/collections";
 
 interface InvoicePreviewModalProps {
   isOpen: boolean;
@@ -15,6 +15,11 @@ interface InvoicePreviewModalProps {
 export default function InvoicePreviewModal({ isOpen, onClose, invoice }: InvoicePreviewModalProps) {
   const { data: settings } = useQuery({ queryKey: ["settings_one"], queryFn: settings_one });
   const { data: clients = [] } = useQuery({ queryKey: ["clients_all"], queryFn: clients_all });
+  const { data: clientDetails } = useQuery({ 
+    queryKey: ["client_detail", invoice?.client_id], 
+    queryFn: () => client_detail(invoice?.client_id),
+    enabled: !!invoice?.client_id
+  });
   const { data: items = [] } = useQuery({ 
     queryKey: ["invoice_items", invoice?.id], 
     queryFn: () => items_by_invoice(invoice?.id),
@@ -23,7 +28,7 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoice }: Invoic
 
   if (!invoice) return null;
 
-  const client = clients.find((c: any) => c.id === invoice.client_id);
+  const client = clientDetails || clients.find((c: any) => c.id === invoice.client_id);
   const currency = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
   const handlePrint = () => {

@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { invoices_all, clients_all, settings_one, create_reminder, create_message_log } from "@/data/collections";
+import { invoices_all, clients_all, settings_one, create_reminder, create_message_log, client_detail } from "@/data/collections";
 import { useToast } from "@/hooks/use-toast";
 import { invalidateTaskCaches } from "@/hooks/useCache";
 
@@ -35,16 +35,21 @@ export default function QuickFollowupModal({ isOpen, onClose }: QuickFollowupMod
     return client?.name || 'Unknown Client';
   };
 
-  const getClientSuggestedTime = (invoice: any) => {
-    const client = clients.find((c: any) => c.id === invoice.client_id);
-    return client?.suggested_hour || "20:30";
+  const getClientSuggestedTime = async (invoice: any) => {
+    try {
+      const client = await client_detail(invoice.client_id);
+      return client?.suggested_hour || "20:30";
+    } catch {
+      return "20:30";
+    }
   };
 
-  const handleInvoiceSelect = (invoiceId: string) => {
+  const handleInvoiceSelect = async (invoiceId: string) => {
     setSelectedInvoiceId(invoiceId);
     const invoice = eligibleInvoices.find((inv: any) => inv.id === invoiceId);
     if (invoice) {
-      setSuggestedTime(getClientSuggestedTime(invoice));
+      const suggestedHour = await getClientSuggestedTime(invoice);
+      setSuggestedTime(suggestedHour);
     }
   };
 
@@ -171,10 +176,7 @@ export default function QuickFollowupModal({ isOpen, onClose }: QuickFollowupMod
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               />
               <Badge variant="outline" className="text-xs">
-                {suggestedTime && selectedInvoiceId ? 
-                  `Client prefers ${getClientSuggestedTime(eligibleInvoices.find((inv: any) => inv.id === selectedInvoiceId))}` : 
-                  'Default time'
-                }
+                Client suggested time
               </Badge>
             </div>
           </div>

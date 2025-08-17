@@ -16,9 +16,22 @@ export async function settings_one() {
 
 // ============ Clients ============
 export async function clients_all() {
-  const { data, error } = await supabase.from("clients").select("*").order("created_at", { ascending: false });
+  const { data, error } = await supabase
+    .from("clients")
+    .select("id, name, created_at, whatsapp, email, gstin, upi_vpa, address, suggested_hour")
+    .order("created_at", { ascending: false });
   if (error) throw error;
   return data || [];
+}
+
+export async function client_detail(id: string) {
+  const { data, error } = await supabase
+    .from("clients")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (error) throw error;
+  return data;
 }
 
 export async function create_client(payload: { name: string; whatsapp: string; email: string; address?: string; gstin?: string; upi_vpa?: string; }) {
@@ -42,15 +55,22 @@ export async function create_project(payload: { client_id: string; name: string;
 
 // ============ Invoices ============
 export async function invoices_all() {
-  const { data, error } = await supabase.from("invoices").select("*").order("created_at", { ascending: false });
+  const { data, error } = await supabase
+    .from("invoices")
+    .select("id, invoice_number, client_id, total_amount, status, issue_date, due_date, created_at, paid_date")
+    .order("created_at", { ascending: false });
   if (error) throw error;
   return data || [];
 }
 
-export async function invoice_by_id(id: string) {
+export async function invoice_detail(id: string) {
   const { data, error } = await supabase.from("invoices").select("*").eq("id", id).single();
   if (error) throw error;
   return data;
+}
+
+export async function invoice_by_id(id: string) {
+  return invoice_detail(id);
 }
 
 export async function create_invoice(payload: {
@@ -116,9 +136,18 @@ export async function delete_item(id: string) {
 
 // ============ Tasks ============
 export async function tasks_all() {
-  const { data, error } = await supabase.from("tasks").select("*").order("created_at", { ascending: false });
+  const { data, error } = await supabase
+    .from("tasks")
+    .select("id, title, client_id, project_id, due_date, status, is_billable, created_at, linked_invoice_id, notes")
+    .order("created_at", { ascending: false });
   if (error) throw error;
   return data || [];
+}
+
+export async function task_detail(id: string) {
+  const { data, error } = await supabase.from("tasks").select("*").eq("id", id).single();
+  if (error) throw error;
+  return data;
 }
 
 export async function create_task(payload: { title: string; project_id?: string | null; due_date?: string | null; is_billable: boolean; status: "open" | "done"; linked_invoice_id?: string | null; notes?: string | null; }) {

@@ -71,3 +71,15 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## Security Posture (Phase-1)
+
+Current security measures implemented:
+- **Data minimization**: Sensitive columns (emails, phone numbers, UPI) excluded from list endpoints
+- **Detail fetching**: Full sensitive data only loaded when specifically accessing individual records
+- **Masking helpers**: Available for UI previews of sensitive data when needed
+- **Supabase Auth safeguards**: Leaked password protection enabled, 5-minute OTP expiry
+- **No RLS yet**: Operating in single-user/demo mode for MVP phase
+
+Phase 2 will implement Row Level Security (RLS) with proper user authentication.
+See `/supabase/policies/phase2_rls_draft.sql` for planned security policies.
