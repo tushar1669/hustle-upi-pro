@@ -140,6 +140,21 @@ export async function delete_task(id: string) {
 }
 
 // ============ Reminders ============
+export async function reminders_all() {
+  const { data, error } = await supabase
+    .from("reminders")
+    .select(`
+      id, invoice_id, scheduled_at, channel, status,
+      invoices!inner(
+        id, invoice_number, total_amount, due_date, 
+        clients!inner(id, name)
+      )
+    `)
+    .order("scheduled_at", { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
 export async function reminders_by_invoice(invoice_id: string) {
   const { data, error } = await supabase.from("reminders").select("*").eq("invoice_id", invoice_id).order("scheduled_at", { ascending: true });
   if (error) throw error;
@@ -154,6 +169,21 @@ export async function create_reminder(payload: { invoice_id: string; scheduled_a
 
 export async function update_reminder(id: string, changes: Partial<{ status: "pending" | "sent" | "skipped"; scheduled_at: string; channel: "whatsapp" | "email"; suggested_time?: string | null; }>) {
   const { data, error } = await supabase.from("reminders").update(changes).eq("id", id).select("*").single();
+  if (error) throw error;
+  return data;
+}
+
+export async function reminders_update_status(id: string, status: "pending" | "sent" | "skipped", sent_at?: string) {
+  const changes: any = { status };
+  if (sent_at) changes.sent_at = sent_at;
+  
+  const { data, error } = await supabase.from("reminders").update(changes).eq("id", id).select("*").single();
+  if (error) throw error;
+  return data;
+}
+
+export async function reminder_reschedule(id: string, scheduled_at: string) {
+  const { data, error } = await supabase.from("reminders").update({ scheduled_at, status: "pending" }).eq("id", id).select("*").single();
   if (error) throw error;
   return data;
 }
@@ -174,6 +204,10 @@ export async function create_message_log(payload: { related_type: "invoice" | "t
   const { data, error } = await supabase.from("message_log").insert(row).select("*").single();
   if (error) throw error;
   return data;
+}
+
+export async function message_log_insert(payload: { related_type: "invoice" | "task"; related_id: string; channel: "whatsapp" | "email"; sent_at?: string; template_used: string; outcome: string; }) {
+  return create_message_log(payload);
 }
 
 // ============ Dashboard View ============
