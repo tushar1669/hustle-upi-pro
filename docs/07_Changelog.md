@@ -1,5 +1,32 @@
 # HustleHub MVP - Changelog
 
+## v2-security-lean
+**Date:** 2025-01-17
+**Type:** Security & Infrastructure
+
+### Changes Made
+- **View Security**: Removed SECURITY DEFINER from v_dashboard_metrics view, recreated as SECURITY INVOKER (safer default)
+- **Data Minimization**: Updated list endpoints to exclude sensitive columns (client contact info, invoice payment details) from bulk queries
+- **Detail Fetching**: Implemented separate detail functions for full client/invoice data when specifically needed
+- **Privacy Helpers**: Added redaction utilities for phone/email/VPA masking in UI previews
+- **Supabase Settings**: Enabled leaked password protection, reduced OTP expiry to 5 minutes
+- **RLS Preparation**: Created draft RLS policies in /supabase/policies/phase2_rls_draft.sql (not yet applied)
+- **Navigation**: Added Follow-ups route and sidebar link (UI-only placeholder if page absent)
+
+### Files Modified
+- src/data/collections.ts - narrowed list selects, added detail functions
+- src/lib/redact.ts - new masking utilities
+- src/components/ClientDetails.tsx - new component for sensitive client data
+- src/components/AppSidebar.tsx - added Follow-ups navigation item
+- Various UI components updated to use detail functions
+- README.md, docs/06_Setup_and_Ops.md - security posture documentation
+
+### Next Steps
+- Phase 2: Enable RLS and apply prepared policies when auth is fully implemented
+- Consider adding field-level access controls for multi-user scenarios
+
+---
+
 ## Version 1.0.0 - August 12, 2025
 
 ### 🎯 MVP Launch - Complete Invoice Management System

@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Users, FolderKanban, ListChecks, FileText, Target, Settings, FilePlus2 } from "lucide-react";
+import { Home, Users, FolderKanban, ListChecks, FileText, Target, Settings, FilePlus2, Bell } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -18,6 +18,7 @@ const items = [
   { title: "Projects", url: "/projects", icon: FolderKanban },
   { title: "Tasks", url: "/tasks", icon: ListChecks },
   { title: "Invoices", url: "/invoices", icon: FileText },
+  { title: "Follow-ups", url: "/follow-ups", icon: Bell },
   { title: "Create Invoice", url: "/invoices/new", icon: FilePlus2 },
   { title: "Savings Goals", url: "/savings", icon: Target },
   { title: "Settings", url: "/settings", icon: Settings },
