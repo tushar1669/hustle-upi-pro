@@ -10,7 +10,8 @@ import { useQuery } from "@tanstack/react-query";
 import { message_log_recent, tasks_all, update_task, v_dashboard_metrics } from "@/data/collections";
 import { useState, useEffect } from "react";
 import { useCelebrationContext } from "@/components/CelebrationProvider";
-import { TrendingUp, Target, Users, FileText, Plus, CheckCircle2, Clock } from "lucide-react";
+import { TrendingUp, Target, Users, FileText, Plus, CheckCircle2, Clock, Send } from "lucide-react";
+import QuickFollowupModal from "@/components/followups/QuickFollowupModal";
 
 const currency = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
@@ -18,6 +19,7 @@ const Index = () => {
   const navigate = useNavigate();
   const { celebrate } = useCelebrationContext();
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [quickFollowupModal, setQuickFollowupModal] = useState(false);
 
   // Check if user needs onboarding (could be based on settings or localStorage)
   useEffect(() => {
@@ -122,7 +124,20 @@ const Index = () => {
                 <div className="text-2xl font-bold text-danger">{currency(overdueAmount)}</div>
                 <Badge variant="danger" className="text-xs">{overdueCount} invoices</Badge>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">needs attention</p>
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-xs text-muted-foreground">needs attention</p>
+                {overdueCount > 0 && (
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => setQuickFollowupModal(true)}
+                    className="h-6 px-2 text-xs"
+                  >
+                    <Send className="h-3 w-3 mr-1" />
+                    Create Follow-up
+                  </Button>
+                )}
+              </div>
             </CardContent>
           </Card>
 
@@ -291,6 +306,12 @@ const Index = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Quick Follow-up Modal */}
+        <QuickFollowupModal
+          isOpen={quickFollowupModal}
+          onClose={() => setQuickFollowupModal(false)}
+        />
       </div>
     </>
   );

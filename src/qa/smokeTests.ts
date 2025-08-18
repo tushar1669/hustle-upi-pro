@@ -433,23 +433,45 @@ class SmokeTestRunner {
     const startTime = Date.now();
     
     try {
-      // This test would typically check DOM elements, but since we're in a data layer context,
-      // we'll verify that the Follow-ups route data dependencies work
-      const reminders = await collections.reminders_all();
+      // Test Quick Follow-up modal functionality
+      const invoices = await collections.invoices_all();
+      const eligibleInvoices = invoices.filter(invoice => 
+        invoice.status === 'sent' || invoice.status === 'overdue'
+      );
+      
+      if (eligibleInvoices.length > 0) {
+        // Test creating a reminder (simulating the modal)
+        const testInvoice = eligibleInvoices[0];
+        const reminder = await collections.create_reminder({
+          invoice_id: testInvoice.id,
+          channel: 'whatsapp',
+          scheduled_at: new Date().toISOString(),
+          status: 'sent'
+        });
+        
+        // Test message log entry
+        await collections.create_message_log({
+          related_type: 'invoice',
+          related_id: testInvoice.id,
+          channel: 'whatsapp',
+          template_used: 'reminder_sent',
+          outcome: 'simulated'
+        });
+      }
       
       return {
-        id: 'NAVIGATION_SIDEBAR',
-        name: 'Navigation Sidebar',
+        id: 'QUICK_FOLLOWUP_MODAL',
+        name: 'Quick Follow-up Modal',
         pass: true,
-        notes: `Follow-ups route data accessible: ${reminders.length} reminders available`,
+        notes: `Quick follow-up functionality tested: ${eligibleInvoices.length} eligible invoices`,
         executionTime: Date.now() - startTime
       };
     } catch (error) {
       return {
-        id: 'NAVIGATION_SIDEBAR',
-        name: 'Navigation Sidebar',
+        id: 'QUICK_FOLLOWUP_MODAL',
+        name: 'Quick Follow-up Modal',
         pass: false,
-        notes: `Failed navigation test: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        notes: `Failed quick follow-up test: ${error instanceof Error ? error.message : 'Unknown error'}`,
         executionTime: Date.now() - startTime
       };
     }

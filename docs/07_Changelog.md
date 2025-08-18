@@ -12,6 +12,7 @@
 - **Supabase Settings**: Enabled leaked password protection, reduced OTP expiry to 5 minutes
 - **RLS Preparation**: Created draft RLS policies in /supabase/policies/phase2_rls_draft.sql (not yet applied)
 - **Navigation**: Added Follow-ups route and sidebar link (UI-only placeholder if page absent)
+- **Quick Follow-up**: Added Quick Follow-up modal (UI only, demo data writes)
 
 ### Files Modified
 - src/data/collections.ts - narrowed list selects, added detail functions

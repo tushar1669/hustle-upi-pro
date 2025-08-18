@@ -21,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useCelebrationContext } from "@/components/CelebrationProvider";
 import { FollowUpPreviewDrawer } from "@/components/FollowUpPreviewDrawer";
 import { RescheduleDialog } from "@/components/RescheduleDialog";
+import QuickFollowupModal from "@/components/followups/QuickFollowupModal";
 import { formatDistanceToNow } from "date-fns";
 
 const currency = (n: number) => `₹${n.toLocaleString("en-IN")}`;
@@ -54,6 +55,7 @@ export default function FollowUps() {
     isOpen: boolean; 
     reminder?: any; 
   }>({ isOpen: false });
+  const [quickFollowupModal, setQuickFollowupModal] = useState(false);
 
   // Helper functions
   const findInvoice = (id: string) => invoices.find((i: any) => i.id === id);
@@ -238,10 +240,16 @@ export default function FollowUps() {
       
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Follow-ups Worklist</h1>
-        <Button variant="outline" onClick={clearFilters} className="gap-2">
-          <X className="h-4 w-4" />
-          Clear Filters
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setQuickFollowupModal(true)} className="gap-2">
+            <Send className="h-4 w-4" />
+            Create Follow-up
+          </Button>
+          <Button variant="outline" onClick={clearFilters} className="gap-2">
+            <X className="h-4 w-4" />
+            Clear Filters
+          </Button>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -458,6 +466,12 @@ export default function FollowUps() {
         onConfirm={handleConfirmReschedule}
         currentDateTime={rescheduleDialog.reminder?.scheduled_at || new Date().toISOString()}
         reminder={rescheduleDialog.reminder}
+      />
+
+      {/* Quick Follow-up Modal */}
+      <QuickFollowupModal
+        isOpen={quickFollowupModal}
+        onClose={() => setQuickFollowupModal(false)}
       />
     </div>
   );
