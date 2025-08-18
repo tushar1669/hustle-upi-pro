@@ -211,6 +211,77 @@ export async function reminders_update_status(id: string, status: "pending" | "s
   return data;
 }
 
+export async function reminders_by_filters(filters: {
+  status?: ("pending" | "sent" | "skipped")[];
+  channel?: ("whatsapp" | "email")[];
+  when?: string;
+  client?: string;
+}) {
+  let query = supabase
+    .from("reminders")
+    .select(`
+      id, invoice_id, scheduled_at, channel, status,
+      invoices!inner(
+        id, invoice_number, total_amount, due_date, status,
+        clients!inner(id, name)
+      )
+    `);
+
+  // Apply filters
+  if (filters.status && filters.status.length > 0) {
+    query = query.in("status", filters.status);
+  }
+  if (filters.channel && filters.channel.length > 0) {
+    query = query.in("channel", filters.channel);
+  }
+  if (filters.when) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    switch (filters.when) {
+      case "today":
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        query = query
+          .gte("scheduled_at", today.toISOString())
+          .lt("scheduled_at", tomorrow.toISOString());
+        break;
+      case "next_7_days":
+        const nextWeek = new Date(today);
+        nextWeek.setDate(nextWeek.getDate() + 7);
+        query = query
+          .gte("scheduled_at", today.toISOString())
+          .lt("scheduled_at", nextWeek.toISOString());
+        break;
+      case "overdue":
+        query = query.lt("scheduled_at", today.toISOString());
+        break;
+      // "all" or default - no date filter
+    }
+  }
+
+  if (filters.client) {
+    // Search by client name (case insensitive)
+    query = query.ilike("invoices.clients.name", `%${filters.client}%`);
+  }
+
+  query = query.order("scheduled_at", { ascending: true });
+  
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
+export async function bulk_update_reminders(ids: string[], changes: Partial<{ status: "pending" | "sent" | "skipped"; scheduled_at: string; }>) {
+  const { data, error } = await supabase
+    .from("reminders")
+    .update(changes)
+    .in("id", ids)
+    .select("*");
+  if (error) throw error;
+  return data || [];
+}
+
 export async function reminder_reschedule(id: string, scheduled_at: string) {
   const { data, error } = await supabase.from("reminders").update({ scheduled_at, status: "pending" }).eq("id", id).select("*").single();
   if (error) throw error;

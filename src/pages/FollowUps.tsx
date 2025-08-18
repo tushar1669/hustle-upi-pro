@@ -1,11 +1,14 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import SEO from "@/components/SEO";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Clock, Send, MessageSquare, Mail, TrendingUp, Filter, Calendar, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Clock, Send, MessageSquare, Mail, TrendingUp, Filter, Calendar, X, Search } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { 
   invoices_all, 
@@ -13,38 +16,56 @@ import {
   message_log_recent, 
   settings_one, 
   reminders_all,
+  reminders_by_filters,
   reminders_update_status,
   reminder_reschedule,
-  message_log_insert
+  message_log_insert,
+  bulk_update_reminders,
+  create_message_log
 } from "@/data/collections";
 import { useToast } from "@/hooks/use-toast";
 import { useCelebrationContext } from "@/components/CelebrationProvider";
 import { FollowUpPreviewDrawer } from "@/components/FollowUpPreviewDrawer";
 import { RescheduleDialog } from "@/components/RescheduleDialog";
 import QuickFollowupModal from "@/components/followups/QuickFollowupModal";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
+import { CACHE_KEYS, invalidateTaskCaches, invalidateInvoiceCaches } from "@/hooks/useCache";
 
 const currency = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
-type StatusFilter = 'all' | 'pending' | 'sent' | 'skipped';
-type DueFilter = 'all' | 'today' | 'week' | 'overdue';
-type ChannelFilter = 'all' | 'whatsapp' | 'email';
+type StatusFilter = ("pending" | "sent" | "skipped")[];
+type ChannelFilter = ("whatsapp" | "email")[];
+type WhenFilter = 'all' | 'today' | 'next_7_days' | 'overdue';
+
+interface Filters {
+  status: StatusFilter;
+  channel: ChannelFilter;
+  when: WhenFilter;
+  client: string;
+}
 
 export default function FollowUps() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: invoices = [] } = useQuery({ queryKey: ["invoices_all"], queryFn: invoices_all });
   const { data: clients = [] } = useQuery({ queryKey: ["clients_all"], queryFn: clients_all });
   const { data: messageLog = [] } = useQuery({ queryKey: ["message_log_recent"], queryFn: message_log_recent });
   const { data: settings } = useQuery({ queryKey: ["settings_one"], queryFn: settings_one });
-  const { data: allReminders = [] } = useQuery({ queryKey: ["reminders_all"], queryFn: reminders_all });
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { celebrate } = useCelebrationContext();
   
+  // Initialize filters from URL params
+  const defaultFilters: Filters = {
+    status: (searchParams.get('status')?.split(',').filter(Boolean) as StatusFilter) || ['pending'],
+    channel: (searchParams.get('channel')?.split(',').filter(Boolean) as ChannelFilter) || [],
+    when: (searchParams.get('when') as WhenFilter) || 'next_7_days',
+    client: searchParams.get('client') || ''
+  };
+
   // State for filters and modals
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [dueFilter, setDueFilter] = useState<DueFilter>('all');
-  const [channelFilter, setChannelFilter] = useState<ChannelFilter>('all');
+  const [filters, setFilters] = useState<Filters>(defaultFilters);
+  const [selectedReminders, setSelectedReminders] = useState<Set<string>>(new Set());
   const [previewDrawer, setPreviewDrawer] = useState<{ 
     isOpen: boolean; 
     reminder?: any; 
@@ -54,8 +75,25 @@ export default function FollowUps() {
   const [rescheduleDialog, setRescheduleDialog] = useState<{ 
     isOpen: boolean; 
     reminder?: any; 
+    bulkMode?: boolean;
   }>({ isOpen: false });
   const [quickFollowupModal, setQuickFollowupModal] = useState(false);
+
+  // Update URL when filters change
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (filters.status.length > 0) params.set('status', filters.status.join(','));
+    if (filters.channel.length > 0) params.set('channel', filters.channel.join(','));
+    if (filters.when !== 'next_7_days') params.set('when', filters.when);
+    if (filters.client) params.set('client', filters.client);
+    setSearchParams(params, { replace: true });
+  }, [filters, setSearchParams]);
+
+  // Query reminders with filters
+  const { data: allReminders = [] } = useQuery({ 
+    queryKey: ["reminders_by_filters", filters], 
+    queryFn: () => reminders_by_filters(filters)
+  });
 
   // Helper functions
   const findInvoice = (id: string) => invoices.find((i: any) => i.id === id);
@@ -64,45 +102,20 @@ export default function FollowUps() {
     return inv ? clients.find((c: any) => c.id === inv.client_id) : null;
   };
 
-  // Compute worklist with filters
+  // Use filtered reminders directly from the query
   const filteredReminders = useMemo(() => {
-    let filtered = allReminders.filter((reminder: any) => {
-      const invoice = findInvoice(reminder.invoice_id);
-      if (!invoice) return false;
-      
+    return allReminders.filter((reminder: any) => {
       // Only show reminders for sent/overdue invoices  
-      if (!['sent', 'overdue'].includes(invoice.status)) return false;
-      
-      // Apply filters
-      if (statusFilter !== 'all' && reminder.status !== statusFilter) return false;
-      if (channelFilter !== 'all' && reminder.channel !== channelFilter) return false;
-      
-      // Due filter
-      if (dueFilter !== 'all') {
-        const scheduledDate = new Date(reminder.scheduled_at);
-        const today = new Date();
-        const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-        const weekStart = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-        
-        if (dueFilter === 'today' && scheduledDate.toDateString() !== today.toDateString()) return false;
-        if (dueFilter === 'week' && scheduledDate < weekStart) return false;
-        if (dueFilter === 'overdue' && scheduledDate >= todayStart) return false;
-      }
-      
-      return true;
+      const invoice = reminder.invoices;
+      return invoice && ['sent', 'overdue'].includes(invoice.status);
     });
-    
-    // Sort by scheduled_at ascending
-    return filtered.sort((a: any, b: any) => 
-      new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()
-    );
-  }, [allReminders, invoices, statusFilter, dueFilter, channelFilter]);
+  }, [allReminders]);
 
   // KPIs
   const today = new Date();
   const todayString = today.toISOString().split('T')[0];
   
-  const remindersDueToday = allReminders.filter((r: any) => 
+  const remindersDueToday = filteredReminders.filter((r: any) => 
     r.status === 'pending' && r.scheduled_at.split('T')[0] === todayString
   ).length;
 
@@ -124,47 +137,65 @@ export default function FollowUps() {
   const responseRate = sentThisWeek > 0 ? 
     Math.round((paidAfterReminder / sentThisWeek) * 100) : 0;
 
-  // Action handlers
-  const handleSendNow = (reminder: any) => {
-    const invoice = findInvoice(reminder.invoice_id);
-    const client = findClient(reminder.invoice_id);
-    
-    if (!invoice || !client) return;
-    
-    setPreviewDrawer({ 
-      isOpen: true, 
-      reminder, 
-      invoice, 
-      client 
-    });
+  // Helper functions for bulk actions
+  const getSelectedPendingReminders = () => {
+    return filteredReminders.filter((r: any) => 
+      selectedReminders.has(r.id) && r.status === 'pending'
+    );
   };
 
-  const handleConfirmSend = async () => {
-    const { reminder, invoice } = previewDrawer;
-    if (!reminder || !invoice) return;
+  const invalidateCaches = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: CACHE_KEYS.REMINDERS });
+    queryClient.invalidateQueries({ queryKey: CACHE_KEYS.MESSAGES });
+    queryClient.invalidateQueries({ queryKey: CACHE_KEYS.DASHBOARD });
+    queryClient.invalidateQueries({ queryKey: ["reminders_by_filters"] });
+  }, [queryClient]);
+
+  // Action handlers
+  const handleSendNow = async (reminder: any, skipPreview = false) => {
+    if (!skipPreview) {
+      const invoice = reminder.invoices || findInvoice(reminder.invoice_id);
+      const client = invoice?.clients || findClient(reminder.invoice_id);
+      
+      if (!invoice || !client) return;
+      
+      setPreviewDrawer({ 
+        isOpen: true, 
+        reminder, 
+        invoice, 
+        client 
+      });
+      return;
+    }
 
     try {
       // Update reminder status to sent
       await reminders_update_status(reminder.id, 'sent', new Date().toISOString());
       
       // Log the action
-      await message_log_insert({
+      await create_message_log({
         related_type: 'invoice',
-        related_id: invoice.id,
+        related_id: reminder.invoice_id,
         channel: reminder.channel,
         template_used: 'payment_reminder',
         outcome: 'simulated'
       });
 
-      // Trigger celebration
       celebrate('reminder_sent');
-      
-      // Refresh data
-      queryClient.invalidateQueries({ queryKey: ["reminders_all"] });
-      queryClient.invalidateQueries({ queryKey: ["message_log_recent"] });
-      
+      invalidateCaches();
+      toast({ title: "Reminder sent (simulated)" });
+    } catch (error) {
+      toast({ title: "Error sending reminder", variant: "destructive" });
+    }
+  };
+
+  const handleConfirmSend = async () => {
+    const { reminder } = previewDrawer;
+    if (!reminder) return;
+
+    try {
+      await handleSendNow(reminder, true);
       setPreviewDrawer({ isOpen: false });
-      toast({ title: "Reminder sent successfully", description: "Status updated and logged." });
     } catch (error) {
       toast({ title: "Error sending reminder", variant: "destructive" });
     }
@@ -175,7 +206,7 @@ export default function FollowUps() {
       await reminders_update_status(reminder.id, 'skipped');
       
       // Log the skip action
-      await message_log_insert({
+      await create_message_log({
         related_type: 'invoice',
         related_id: reminder.invoice_id,
         channel: reminder.channel,
@@ -183,40 +214,112 @@ export default function FollowUps() {
         outcome: 'skipped_by_user'
       });
 
-      // Refresh data
-      queryClient.invalidateQueries({ queryKey: ["reminders_all"] });
-      queryClient.invalidateQueries({ queryKey: ["message_log_recent"] });
-      
+      invalidateCaches();
       toast({ title: "Reminder skipped" });
     } catch (error) {
       toast({ title: "Error skipping reminder", variant: "destructive" });
     }
   };
 
-  const handleReschedule = (reminder: any) => {
-    setRescheduleDialog({ isOpen: true, reminder });
+  const handleReschedule = (reminder?: any, bulkMode = false) => {
+    setRescheduleDialog({ isOpen: true, reminder, bulkMode });
   };
 
   const handleConfirmReschedule = async (newDateTime: string) => {
-    const { reminder } = rescheduleDialog;
-    if (!reminder) return;
-
+    const { reminder, bulkMode } = rescheduleDialog;
+    
     try {
-      await reminder_reschedule(reminder.id, newDateTime);
+      if (bulkMode) {
+        const selectedPending = getSelectedPendingReminders();
+        if (selectedPending.length === 0) return;
+        
+        await bulk_update_reminders(
+          selectedPending.map(r => r.id),
+          { scheduled_at: newDateTime, status: 'pending' }
+        );
+        
+        setSelectedReminders(new Set());
+        toast({ title: `${selectedPending.length} reminders rescheduled` });
+      } else if (reminder) {
+        await reminder_reschedule(reminder.id, newDateTime);
+        toast({ title: "Reminder rescheduled" });
+      }
       
-      // Refresh data
-      queryClient.invalidateQueries({ queryKey: ["reminders_all"] });
-      
+      invalidateCaches();
       setRescheduleDialog({ isOpen: false });
-      toast({ title: "Reminder rescheduled successfully" });
     } catch (error) {
       toast({ title: "Error rescheduling reminder", variant: "destructive" });
     }
   };
 
+  // Bulk action handlers
+  const handleBulkSendNow = async () => {
+    const selectedPending = getSelectedPendingReminders();
+    if (selectedPending.length === 0) return;
+
+    try {
+      // Update all to sent status
+      await bulk_update_reminders(
+        selectedPending.map(r => r.id),
+        { status: 'sent' }
+      );
+
+      // Log actions for each
+      await Promise.all(
+        selectedPending.map(reminder =>
+          create_message_log({
+            related_type: 'invoice',
+            related_id: reminder.invoice_id,
+            channel: reminder.channel,
+            template_used: 'payment_reminder',
+            outcome: 'simulated'
+          })
+        )
+      );
+
+      setSelectedReminders(new Set());
+      celebrate('reminder_sent');
+      invalidateCaches();
+      toast({ title: `${selectedPending.length} reminders sent (simulated)` });
+    } catch (error) {
+      toast({ title: "Error sending reminders", variant: "destructive" });
+    }
+  };
+
+  const handleBulkSkip = async () => {
+    const selectedPending = getSelectedPendingReminders();
+    if (selectedPending.length === 0) return;
+
+    try {
+      await bulk_update_reminders(
+        selectedPending.map(r => r.id),
+        { status: 'skipped' }
+      );
+
+      // Log skip actions
+      await Promise.all(
+        selectedPending.map(reminder =>
+          create_message_log({
+            related_type: 'invoice',
+            related_id: reminder.invoice_id,
+            channel: reminder.channel,
+            template_used: 'reminder_skipped',
+            outcome: 'skipped_by_user'
+          })
+        )
+      );
+
+      setSelectedReminders(new Set());
+      invalidateCaches();
+      toast({ title: `${selectedPending.length} reminders skipped` });
+    } catch (error) {
+      toast({ title: "Error skipping reminders", variant: "destructive" });
+    }
+  };
+
   const getStage = (reminder: any, invoice: any) => {
     const daysOverdue = Math.ceil((new Date().getTime() - new Date(invoice.due_date).getTime()) / (1000 * 60 * 60 * 24));
-    return daysOverdue <= 3 ? 'gentle' : daysOverdue <= 14 ? 'professional' : 'firm';
+    return daysOverdue <= 7 ? 'gentle' : daysOverdue <= 14 ? 'professional' : 'firm';
   };
 
   const getStatusBadgeVariant = (status: string) => {
@@ -229,10 +332,45 @@ export default function FollowUps() {
   };
 
   const clearFilters = () => {
-    setStatusFilter('all');
-    setDueFilter('all');
-    setChannelFilter('all');
+    setFilters({
+      status: ['pending'],
+      channel: [],
+      when: 'next_7_days',
+      client: ''
+    });
   };
+
+  const updateFilters = (key: keyof Filters, value: any) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const toggleSelection = (reminderId: string, isSelected: boolean) => {
+    setSelectedReminders(prev => {
+      const newSet = new Set(prev);
+      if (isSelected) {
+        newSet.add(reminderId);
+      } else {
+        newSet.delete(reminderId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAll = (isSelected: boolean) => {
+    if (isSelected) {
+      const pendingIds = filteredReminders
+        .filter(r => r.status === 'pending')
+        .map(r => r.id);
+      setSelectedReminders(new Set(pendingIds));
+    } else {
+      setSelectedReminders(new Set());
+    }
+  };
+
+  const hasSelection = selectedReminders.size > 0;
+  const allPendingSelected = filteredReminders
+    .filter(r => r.status === 'pending')
+    .every(r => selectedReminders.has(r.id));
 
   return (
     <div className="space-y-6">
@@ -297,53 +435,110 @@ export default function FollowUps() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Status</label>
-              <Select value={statusFilter} onValueChange={(value: StatusFilter) => setStatusFilter(value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="sent">Sent</SelectItem>
-                  <SelectItem value="skipped">Skipped</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="space-y-2">
+                {[
+                  { value: 'pending', label: 'Pending' },
+                  { value: 'sent', label: 'Sent' },
+                  { value: 'skipped', label: 'Skipped' }
+                ].map(status => (
+                  <label key={status.value} className="flex items-center space-x-2">
+                    <Checkbox
+                      checked={filters.status.includes(status.value as any)}
+                      onCheckedChange={(checked) => {
+                        const newStatus = checked
+                          ? [...filters.status, status.value as any]
+                          : filters.status.filter(s => s !== status.value);
+                        updateFilters('status', newStatus);
+                      }}
+                    />
+                    <span className="text-sm">{status.label}</span>
+                  </label>
+                ))}
+              </div>
             </div>
             
             <div className="space-y-2">
-              <label className="text-sm font-medium">Due</label>
-              <Select value={dueFilter} onValueChange={(value: DueFilter) => setDueFilter(value)}>
+              <label className="text-sm font-medium">Channel</label>
+              <div className="space-y-2">
+                {[
+                  { value: 'whatsapp', label: 'WhatsApp' },
+                  { value: 'email', label: 'Email' }
+                ].map(channel => (
+                  <label key={channel.value} className="flex items-center space-x-2">
+                    <Checkbox
+                      checked={filters.channel.includes(channel.value as any)}
+                      onCheckedChange={(checked) => {
+                        const newChannel = checked
+                          ? [...filters.channel, channel.value as any]
+                          : filters.channel.filter(c => c !== channel.value);
+                        updateFilters('channel', newChannel);
+                      }}
+                    />
+                    <span className="text-sm">{channel.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium">When</label>
+              <Select value={filters.when} onValueChange={(value: WhenFilter) => updateFilters('when', value)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Times</SelectItem>
                   <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="week">This Week</SelectItem>
+                  <SelectItem value="next_7_days">Next 7 days</SelectItem>
                   <SelectItem value="overdue">Overdue</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             
             <div className="space-y-2">
-              <label className="text-sm font-medium">Channel</label>
-              <Select value={channelFilter} onValueChange={(value: ChannelFilter) => setChannelFilter(value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Channels</SelectItem>
-                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                  <SelectItem value="email">Email</SelectItem>
-                </SelectContent>
-              </Select>
+              <label className="text-sm font-medium">Client Search</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search client name..."
+                  value={filters.client}
+                  onChange={(e) => updateFilters('client', e.target.value)}
+                  className="pl-9"
+                />
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Bulk Actions Bar */}
+      {hasSelection && (
+        <Card className="border-primary bg-primary/5">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">
+                {selectedReminders.size} reminder{selectedReminders.size !== 1 ? 's' : ''} selected
+              </span>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={handleBulkSendNow}>
+                  <Send className="h-4 w-4 mr-1" />
+                  Send Now
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => handleReschedule(undefined, true)}>
+                  <Calendar className="h-4 w-4 mr-1" />
+                  Reschedule
+                </Button>
+                <Button size="sm" variant="outline" onClick={handleBulkSkip}>
+                  Skip All
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Reminders Worklist */}
       <Card>
@@ -354,27 +549,45 @@ export default function FollowUps() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={allPendingSelected && filteredReminders.filter(r => r.status === 'pending').length > 0}
+                    onCheckedChange={selectAll}
+                    aria-label="Select all pending reminders"
+                  />
+                </TableHead>
                 <TableHead>Invoice #</TableHead>
                 <TableHead>Client</TableHead>
-                <TableHead>Due</TableHead>
+                <TableHead>Scheduled</TableHead>
                 <TableHead>Channel</TableHead>
-                <TableHead>Stage</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredReminders.map((reminder: any) => {
-                const invoice = findInvoice(reminder.invoice_id);
-                const client = findClient(reminder.invoice_id);
+                const invoice = reminder.invoices;
+                const client = invoice?.clients;
                 
                 if (!invoice || !client) return null;
 
-                const stage = getStage(reminder, invoice);
-                const dueTime = formatDistanceToNow(new Date(reminder.scheduled_at), { addSuffix: true });
+                const scheduledDate = new Date(reminder.scheduled_at);
+                const dueTime = formatDistanceToNow(scheduledDate, { addSuffix: true });
+                const isOverdue = scheduledDate < new Date();
+                const isSelected = selectedReminders.has(reminder.id);
+                const canSelect = reminder.status === 'pending';
 
                 return (
-                  <TableRow key={reminder.id}>
+                  <TableRow key={reminder.id} className={isSelected ? "bg-muted/50" : ""}>
+                    <TableCell className="w-12">
+                      {canSelect && (
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={(checked) => toggleSelection(reminder.id, !!checked)}
+                          aria-label={`Select reminder for ${invoice.invoice_number}`}
+                        />
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Button variant="link" className="p-0 h-auto font-mono">
                         {invoice.invoice_number}
@@ -382,13 +595,14 @@ export default function FollowUps() {
                     </TableCell>
                     <TableCell className="font-medium">{client.name}</TableCell>
                     <TableCell>
-                      <span className={
-                        new Date(reminder.scheduled_at) < new Date() 
-                          ? "text-destructive font-medium" 
-                          : "text-muted-foreground"
-                      }>
-                        {dueTime}
-                      </span>
+                      <div className="space-y-1">
+                        <div className={isOverdue ? "text-destructive font-medium" : "text-muted-foreground"}>
+                          {dueTime}
+                        </div>
+                        <div className="text-xs text-muted-foreground" title={scheduledDate.toISOString()}>
+                          {format(scheduledDate, 'MMM d, h:mm a')}
+                        </div>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -399,11 +613,6 @@ export default function FollowUps() {
                         )}
                         <span className="capitalize">{reminder.channel}</span>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={stage === 'gentle' ? 'secondary' : stage === 'professional' ? 'default' : 'destructive'}>
-                        {stage.toUpperCase()}
-                      </Badge>
                     </TableCell>
                     <TableCell>
                       <Badge variant={getStatusBadgeVariant(reminder.status)}>
@@ -466,6 +675,8 @@ export default function FollowUps() {
         onConfirm={handleConfirmReschedule}
         currentDateTime={rescheduleDialog.reminder?.scheduled_at || new Date().toISOString()}
         reminder={rescheduleDialog.reminder}
+        bulkMode={rescheduleDialog.bulkMode}
+        selectedCount={rescheduleDialog.bulkMode ? selectedReminders.size : undefined}
       />
 
       {/* Quick Follow-up Modal */}

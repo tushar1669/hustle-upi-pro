@@ -14,15 +14,19 @@ interface RescheduleDialogProps {
   onClose: () => void;
   onConfirm: (newDateTime: string) => void;
   currentDateTime: string;
-  reminder: any;
+  reminder?: any;
+  bulkMode?: boolean;
+  selectedCount?: number;
 }
 
 export function RescheduleDialog({ 
   isOpen, 
   onClose, 
   onConfirm, 
-  currentDateTime, 
-  reminder 
+  currentDateTime,
+  reminder,
+  bulkMode,
+  selectedCount 
 }: RescheduleDialogProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date(currentDateTime));
   const [selectedTime, setSelectedTime] = useState(
