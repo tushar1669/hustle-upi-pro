@@ -102,6 +102,7 @@ export type Database = {
           issue_date: string | null
           owner_id: string | null
           paid_date: string | null
+          pdf_url: string | null
           project_id: string | null
           share_url: string | null
           status: Database["public"]["Enums"]["invoice_status"]
@@ -120,6 +121,7 @@ export type Database = {
           issue_date?: string | null
           owner_id?: string | null
           paid_date?: string | null
+          pdf_url?: string | null
           project_id?: string | null
           share_url?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
@@ -138,6 +140,7 @@ export type Database = {
           issue_date?: string | null
           owner_id?: string | null
           paid_date?: string | null
+          pdf_url?: string | null
           project_id?: string | null
           share_url?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
@@ -271,9 +274,13 @@ export type Database = {
       }
       settings: {
         Row: {
+          company_address: string | null
+          company_name: string | null
           created_at: string | null
           creator_display_name: string
           default_gst_percent: number
+          footer_message: string | null
+          gstin: string | null
           id: number
           invoice_prefix: string
           logo_url: string | null
@@ -281,9 +288,13 @@ export type Database = {
           upi_vpa: string
         }
         Insert: {
+          company_address?: string | null
+          company_name?: string | null
           created_at?: string | null
           creator_display_name?: string
           default_gst_percent?: number
+          footer_message?: string | null
+          gstin?: string | null
           id?: never
           invoice_prefix?: string
           logo_url?: string | null
@@ -291,9 +302,13 @@ export type Database = {
           upi_vpa?: string
         }
         Update: {
+          company_address?: string | null
+          company_name?: string | null
           created_at?: string | null
           creator_display_name?: string
           default_gst_percent?: number
+          footer_message?: string | null
+          gstin?: string | null
           id?: never
           invoice_prefix?: string
           logo_url?: string | null

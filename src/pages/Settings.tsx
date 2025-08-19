@@ -14,6 +14,10 @@ import { CACHE_KEYS } from "@/hooks/useCache";
 interface Settings {
   id?: number;
   creator_display_name?: string;
+  company_name?: string;
+  gstin?: string;
+  company_address?: string;
+  footer_message?: string;
   default_gst_percent?: number;
   invoice_prefix?: string;
   logo_url?: string;
@@ -73,6 +77,10 @@ export default function Settings() {
 
       const updateData = { 
         creator_display_name: values.creator_display_name,
+        company_name: values.company_name,
+        gstin: values.gstin,
+        company_address: values.company_address,
+        footer_message: values.footer_message,
         invoice_prefix: values.invoice_prefix,
         default_gst_percent: values.default_gst_percent,
         upi_vpa: values.upi_vpa,
@@ -135,6 +143,10 @@ export default function Settings() {
     
     const values: Partial<Settings> = {
       creator_display_name: formData.get('creator_display_name') as string || '',
+      company_name: formData.get('company_name') as string || '',
+      gstin: formData.get('gstin') as string || '',
+      company_address: formData.get('company_address') as string || '',
+      footer_message: formData.get('footer_message') as string || '',
       upi_vpa: formData.get('upi_vpa') as string || '',
       invoice_prefix: formData.get('invoice_prefix') as string || '',
       default_gst_percent: Number(formData.get('default_gst_percent')) || 18,
@@ -185,6 +197,46 @@ export default function Settings() {
                   name="creator_display_name"
                   defaultValue={settings?.creator_display_name || ''}
                   placeholder="Your Business Name"
+                />
+              </div>
+              
+              <div className="grid gap-2">
+                <Label htmlFor="company_name">Company Name</Label>
+                <Input
+                  id="company_name"
+                  name="company_name"
+                  defaultValue={settings?.company_name || settings?.creator_display_name || ''}
+                  placeholder="Official Company Name"
+                />
+              </div>
+              
+              <div className="grid gap-2">
+                <Label htmlFor="gstin">GSTIN</Label>
+                <Input
+                  id="gstin"
+                  name="gstin"
+                  defaultValue={settings?.gstin || ''}
+                  placeholder="22AAAAA0000A1Z5"
+                />
+              </div>
+              
+              <div className="grid gap-2">
+                <Label htmlFor="company_address">Company Address</Label>
+                <Input
+                  id="company_address"
+                  name="company_address"
+                  defaultValue={settings?.company_address || ''}
+                  placeholder="123 Business Street, City, State, PIN"
+                />
+              </div>
+              
+              <div className="grid gap-2">
+                <Label htmlFor="footer_message">Footer Message</Label>
+                <Input
+                  id="footer_message"
+                  name="footer_message"
+                  defaultValue={settings?.footer_message || ''}
+                  placeholder="Thank you for your business!"
                 />
               </div>
               

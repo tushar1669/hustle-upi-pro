@@ -2,9 +2,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { X, Download, Printer } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { X, Download, Printer, FileDown, Loader2 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { settings_one, clients_all, client_detail, items_by_invoice } from "@/data/collections";
+import { generateInvoicePDF, downloadPDF } from "@/lib/pdfGenerator";
+import { toast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 interface InvoicePreviewModalProps {
   isOpen: boolean;
@@ -13,6 +16,9 @@ interface InvoicePreviewModalProps {
 }
 
 export default function InvoicePreviewModal({ isOpen, onClose, invoice }: InvoicePreviewModalProps) {
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const queryClient = useQueryClient();
+  
   const { data: settings } = useQuery({ queryKey: ["settings_one"], queryFn: settings_one });
   const { data: clients = [] } = useQuery({ queryKey: ["clients_all"], queryFn: clients_all });
   const { data: clientDetails } = useQuery({ 
@@ -35,75 +41,48 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoice }: Invoic
     window.print();
   };
 
-  const handleDownload = () => {
-    // Generate PDF using browser's print to PDF functionality
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Invoice ${invoice.invoice_number}</title>
-            <style>
-              body { font-family: Arial, sans-serif; margin: 20px; }
-              .invoice-header { border-bottom: 2px solid #17B897; padding-bottom: 20px; margin-bottom: 20px; }
-              .invoice-logo { max-height: 60px; margin-bottom: 10px; }
-              .invoice-title { color: #17B897; font-size: 24px; font-weight: bold; }
-              .invoice-details { margin: 20px 0; }
-              .invoice-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-              .invoice-table th, .invoice-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-              .invoice-table th { background-color: #f8f9fa; }
-              .invoice-summary { text-align: right; margin-top: 20px; }
-              .total-amount { font-size: 18px; font-weight: bold; color: #17B897; }
-            </style>
-          </head>
-          <body>
-            <div class="invoice-header">
-              ${(settings as any)?.logo_url ? `<img src="${(settings as any).logo_url}" alt="Logo" class="invoice-logo" />` : `<img src="/assets/Logo_hustlehub.png" alt="HustleHub" class="invoice-logo" />`}
-              <div class="invoice-title">INVOICE</div>
-              <div><strong>Invoice #:</strong> ${invoice.invoice_number}</div>
-              <div><strong>Date:</strong> ${new Date(invoice.issue_date).toLocaleDateString()}</div>
-              <div><strong>Due Date:</strong> ${new Date(invoice.due_date).toLocaleDateString()}</div>
-            </div>
-            
-            <div class="invoice-details">
-              <div><strong>Bill To:</strong></div>
-              <div>${client?.name || 'Unknown Client'}</div>
-              ${client?.email ? `<div>${client.email}</div>` : ''}
-              ${client?.whatsapp ? `<div>Phone: ${client.whatsapp}</div>` : ''}
-              ${client?.gstin ? `<div>GSTIN: ${client.gstin}</div>` : ''}
-            </div>
+  const handleDownload = async () => {
+    try {
+      setIsGeneratingPDF(true);
+      
+      // Check if PDF already exists
+      if (invoice.pdf_url) {
+        await downloadPDF(invoice.pdf_url, `invoice_${invoice.invoice_number}.pdf`);
+        toast({
+          title: "PDF Downloaded",
+          description: "Invoice PDF has been downloaded successfully.",
+        });
+        return;
+      }
 
-            <table class="invoice-table">
-              <thead>
-                <tr>
-                  <th>Description</th>
-                  <th>Qty</th>
-                  <th>Rate</th>
-                  <th>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${items.map((item: any) => `
-                  <tr>
-                    <td>${item.title}</td>
-                    <td>${item.qty}</td>
-                    <td>${currency(item.rate)}</td>
-                    <td>${currency(item.amount)}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
+      // Generate new PDF
+      const pdfUrl = await generateInvoicePDF(
+        invoice,
+        client,
+        items,
+        settings as any
+      );
 
-            <div class="invoice-summary">
-              <div><strong>Subtotal:</strong> ${currency(invoice.subtotal)}</div>
-              <div><strong>GST (${settings?.default_gst_percent || 18}%):</strong> ${currency(invoice.gst_amount)}</div>
-              <div class="total-amount"><strong>Total Amount:</strong> ${currency(invoice.total_amount)}</div>
-            </div>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.print();
+      // Download the PDF
+      await downloadPDF(pdfUrl, `invoice_${invoice.invoice_number}.pdf`);
+      
+      // Invalidate queries to update the invoice with PDF URL
+      queryClient.invalidateQueries({ queryKey: ["invoices_all"] });
+      queryClient.invalidateQueries({ queryKey: ["invoice_detail", invoice.id] });
+      
+      toast({
+        title: "PDF Generated & Downloaded",
+        description: "Invoice PDF has been generated and downloaded successfully.",
+      });
+    } catch (error) {
+      console.error('PDF download error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate or download PDF. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingPDF(false);
     }
   };
 
@@ -117,9 +96,20 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoice }: Invoic
               <Printer className="h-4 w-4 mr-2" />
               Print
             </Button>
-            <Button variant="outline" size="sm" onClick={handleDownload}>
-              <Download className="h-4 w-4 mr-2" />
-              Download PDF
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleDownload}
+              disabled={isGeneratingPDF}
+            >
+              {isGeneratingPDF ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : invoice.pdf_url ? (
+                <Download className="h-4 w-4 mr-2" />
+              ) : (
+                <FileDown className="h-4 w-4 mr-2" />
+              )}
+              {isGeneratingPDF ? "Generating..." : invoice.pdf_url ? "Download PDF" : "Generate & Download PDF"}
             </Button>
             <Button variant="ghost" size="sm" onClick={onClose}>
               <X className="h-4 w-4" />
@@ -132,7 +122,7 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoice }: Invoic
           <div className="border-b-2 border-primary pb-6">
             <div className="mb-4">
               <img 
-                src={(settings as any)?.logo_url || "/assets/Logo_hustlehub.png"} 
+                src={(settings as any)?.logo_url || "/assets/Full_Logo_hustlehub.png"} 
                 alt="Company Logo" 
                 className="h-16"
               />
@@ -154,14 +144,27 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoice }: Invoic
             </div>
           </div>
 
-          {/* Bill To */}
-          <div>
-            <h3 className="font-medium mb-2">Bill To:</h3>
-            <div className="text-sm space-y-1">
-              <div className="font-medium">{client?.name || 'Unknown Client'}</div>
-              {client?.email && <div>{client.email}</div>}
-              {client?.whatsapp && <div>Phone: {client.whatsapp}</div>}
-              {client?.gstin && <div>GSTIN: {client.gstin}</div>}
+          {/* Business & Client Info */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+              <h3 className="font-medium mb-3 text-primary border-b border-border pb-2">From:</h3>
+              <div className="text-sm space-y-1">
+                <div className="font-medium text-base">{(settings as any)?.company_name || (settings as any)?.creator_display_name || 'Business Name'}</div>
+                {(settings as any)?.company_address && <div>{(settings as any).company_address}</div>}
+                {(settings as any)?.gstin && <div><span className="font-medium">GSTIN:</span> {(settings as any).gstin}</div>}
+                {(settings as any)?.upi_vpa && <div><span className="font-medium">UPI:</span> {(settings as any).upi_vpa}</div>}
+              </div>
+            </div>
+            
+            <div>
+              <h3 className="font-medium mb-3 text-primary border-b border-border pb-2">Bill To:</h3>
+              <div className="text-sm space-y-1">
+                <div className="font-medium text-base">{client?.name || 'Unknown Client'}</div>
+                {client?.email && <div>{client.email}</div>}
+                {client?.whatsapp && <div>Phone: {client.whatsapp}</div>}
+                {client?.address && <div>{client.address}</div>}
+                {client?.gstin && <div><span className="font-medium">GSTIN:</span> {client.gstin}</div>}
+              </div>
             </div>
           </div>
 
@@ -218,6 +221,13 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoice }: Invoic
                   <div><span className="font-medium">UTR Reference:</span> {invoice.utr_reference}</div>
                 )}
               </div>
+            </div>
+           )}
+
+          {/* Footer Message */}
+          {(settings as any)?.footer_message && (
+            <div className="border-t pt-4 text-center text-muted-foreground italic">
+              {(settings as any).footer_message}
             </div>
           )}
         </div>
