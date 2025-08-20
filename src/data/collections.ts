@@ -4,10 +4,22 @@ import { supabase } from "@/integrations/supabase/client";
 // View: v_dashboard_metrics
 
 // ============ Settings ============
-export async function settings_one() {
+export interface SettingsData {
+  creator_display_name: string;
+  company_name: string | null;
+  gstin: string | null;
+  company_address: string | null;
+  footer_message: string | null;
+  logo_url: string | null;
+  upi_vpa: string;
+  default_gst_percent: number;
+  invoice_prefix: string;
+}
+
+export async function settings_one(): Promise<SettingsData | null> {
   const { data, error } = await supabase
     .from("settings")
-    .select("creator_display_name, upi_vpa, default_gst_percent, invoice_prefix")
+    .select("creator_display_name, company_name, gstin, company_address, footer_message, logo_url, upi_vpa, default_gst_percent, invoice_prefix")
     .limit(1)
     .maybeSingle();
   if (error) throw error;

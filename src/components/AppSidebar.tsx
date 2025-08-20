@@ -32,7 +32,7 @@ export function AppSidebar() {
 
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
     isActive 
-      ? "bg-primary/10 text-primary font-medium border-r-2 border-r-primary" 
+      ? "bg-orange-50 text-orange-500 font-medium border-r-2 border-r-orange-500" 
       : "hover:bg-sidebar-accent/50 hover:text-foreground transition-colors";
 
   return (

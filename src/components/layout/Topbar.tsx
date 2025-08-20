@@ -6,9 +6,12 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { Bell, Search, LogOut, User } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { settings_one } from "@/data/collections";
 
 export default function Topbar() {
   const { user, signOut } = useAuth();
+  const { data: settings } = useQuery({ queryKey: ["settings_one"], queryFn: settings_one });
 
   const getUserInitials = (email?: string) => {
     if (!email) return 'U';
@@ -20,11 +23,17 @@ export default function Topbar() {
       <div className="container flex items-center gap-3">
         <SidebarTrigger className="ml-0" />
         <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <img 
-            src="/assets/Full_Logo_hustlehub.png" 
-            alt="HustleHub" 
-            className="h-8 w-8 object-contain"
-          />
+          {settings?.logo_url ? (
+            <img 
+              src={settings.logo_url} 
+              alt="Logo" 
+              className="h-8 w-8 object-contain"
+            />
+          ) : (
+            <span className="h-8 w-8 flex items-center justify-center bg-primary text-primary-foreground rounded font-bold text-sm">
+              HH
+            </span>
+          )}
           <span className="font-semibold">HustleHub</span>
           <span className="text-muted-foreground hidden sm:inline">— Your UPI-first Hustle-HQ</span>
         </Link>

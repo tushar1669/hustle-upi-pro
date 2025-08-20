@@ -15,6 +15,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { invoices_all, clients_all, update_invoice, create_message_log, reminders_by_invoice, update_reminder, settings_one } from "@/data/collections";
 import { useToast } from "@/hooks/use-toast";
 import { useCelebrationContext } from "@/components/CelebrationProvider";
+import InvoicePreviewModal from "@/components/InvoicePreviewModal";
 
 const currency = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
@@ -34,6 +35,8 @@ export default function InvoicesList() {
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [paidDate, setPaidDate] = useState("");
   const [utrReference, setUtrReference] = useState("");
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [selectedPreviewInvoice, setSelectedPreviewInvoice] = useState<any>(null);
 
   const clientName = (id: string) => clients.find((c: any) => c.id === id)?.name || "Unknown";
 
@@ -233,7 +236,12 @@ Thank you!`;
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => {
+                                  setSelectedPreviewInvoice(invoice);
+                                  setShowPreviewModal(true);
+                                }}
+                              >
                                 <Eye className="mr-2 h-4 w-4" />
                                 Preview
                               </DropdownMenuItem>
@@ -259,7 +267,7 @@ Thank you!`;
                               )}
                               
                               {invoice.status === "draft" && (
-                                <DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => navigate(`/invoices/edit/${invoice.id}`)}>
                                   <Edit className="mr-2 h-4 w-4" />
                                   Edit
                                 </DropdownMenuItem>
@@ -320,6 +328,18 @@ Thank you!`;
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Invoice Preview Modal */}
+      {selectedPreviewInvoice && (
+        <InvoicePreviewModal
+          isOpen={showPreviewModal}
+          onClose={() => {
+            setShowPreviewModal(false);
+            setSelectedPreviewInvoice(null);
+          }}
+          invoice={selectedPreviewInvoice}
+        />
+      )}
     </div>
   );
 }
