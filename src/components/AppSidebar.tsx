@@ -32,8 +32,8 @@ export function AppSidebar() {
 
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
     isActive 
-      ? "bg-orange-50 text-orange-500 font-medium border-r-2 border-r-orange-500" 
-      : "hover:bg-sidebar-accent/50 hover:text-foreground transition-colors";
+      ? "bg-orange-50 text-orange-500 font-medium border-r-2 border-r-orange-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2" 
+      : "hover:bg-orange-50 hover:text-orange-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2";
 
   return (
     <Sidebar collapsible="icon">
