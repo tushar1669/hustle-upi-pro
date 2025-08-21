@@ -5,6 +5,7 @@ import { QALocalStorage, type QATestResult, type QARunHistory } from './localSto
 import { codeSnapshotManager } from './codeSnapshot';
 import { create_message_log } from '@/data/collections';
 import { supabase } from '@/integrations/supabase/client';
+import { runSanityV2, type SanityV2Summary } from './sanityV2';
 
 export interface TestRunSummary {
   totalTests: number;
@@ -343,6 +344,11 @@ export class QATestRunner {
 
   getRunHistory(): QARunHistory[] {
     return QALocalStorage.getRunHistory();
+  }
+
+  // New Sanity V2 runner integration
+  async runSanityV2({ fix = false }: { fix?: boolean } = {}): Promise<SanityV2Summary> {
+    return await runSanityV2({ fix });
   }
 }
 

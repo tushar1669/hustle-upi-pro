@@ -2,13 +2,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
-import { Plus, FileText, Users, CheckSquare, DollarSign } from "lucide-react";
+import { Plus, FileText, Users, CheckSquare, DollarSign, TestTube } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { clients_all, tasks_all, invoices_all, v_dashboard_metrics, update_task, create_message_log } from "@/data/collections";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import AddTaskModal from "@/components/AddTaskModal";
 import { CACHE_KEYS, invalidateTaskCaches } from "@/hooks/useCache";
+import { qaTestRunner } from "@/qa/testRunner";
 
 const currency = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
@@ -88,6 +89,35 @@ export default function QuickActionsWidget() {
 
   const handleCreateFollowUp = () => {
     navigate("/follow-ups");
+  };
+
+  const handleRunSanityV2 = async () => {
+    try {
+      const summary = await qaTestRunner.runSanityV2({ fix: false });
+      
+      // Show toast with results
+      toast({
+        title: "QA completed",
+        description: `${summary.passed} passed, ${summary.failed} failed, ${summary.warnings} warnings — see console for details`,
+        duration: 5000,
+      });
+
+      // Add recent activity entry
+      await create_message_log({
+        related_type: 'qa' as any,
+        related_id: crypto.randomUUID(),
+        channel: 'email' as any,
+        template_used: 'qa_check',
+        outcome: `Sanity V2: ${summary.passed}/${summary.totalTests} passed`
+      });
+
+    } catch (error) {
+      toast({
+        title: "QA failed",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -249,6 +279,19 @@ export default function QuickActionsWidget() {
               )}
             </div>
           </div>
+        </div>
+
+        {/* QA Testing Section */}
+        <div className="pt-4 border-t">
+          <Button 
+            onClick={handleRunSanityV2} 
+            variant="outline" 
+            size="sm"
+            className="w-full h-auto flex items-center gap-2 p-3 text-xs"
+          >
+            <TestTube className="w-4 h-4" />
+            <span>Run QA (Sanity v2)</span>
+          </Button>
         </div>
       </CardContent>
       
