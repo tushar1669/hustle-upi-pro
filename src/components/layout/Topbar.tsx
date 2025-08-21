@@ -12,6 +12,10 @@ import { settings_one } from "@/data/collections";
 export default function Topbar() {
   const { user, signOut } = useAuth();
   const { data: settings } = useQuery({ queryKey: ["settings_one"], queryFn: settings_one });
+  const logoSrc =
+    settings?.logo_url && settings.logo_url.trim() !== ""
+      ? settings.logo_url
+      : "/assets/Full_Logo_hustlehub.png";
 
   const getUserInitials = (email?: string) => {
     if (!email) return 'U';
@@ -23,17 +27,7 @@ export default function Topbar() {
       <div className="container flex items-center gap-3">
         <SidebarTrigger className="ml-0" />
         <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          {settings?.logo_url ? (
-            <img 
-              src={settings.logo_url} 
-              alt="Logo" 
-              className="h-8 w-8 object-contain"
-            />
-          ) : (
-            <span className="h-8 w-8 flex items-center justify-center bg-primary text-primary-foreground rounded font-bold text-sm">
-              HH
-            </span>
-          )}
+          <img src={logoSrc} alt="HustleHub logo" className="h-6 w-auto" />
           <span className="font-semibold">HustleHub</span>
           <span className="text-muted-foreground hidden sm:inline">— Your UPI-first Hustle-HQ</span>
         </Link>

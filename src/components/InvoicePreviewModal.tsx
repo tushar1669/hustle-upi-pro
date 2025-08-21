@@ -20,6 +20,10 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoice }: Invoic
   const queryClient = useQueryClient();
   
   const { data: settings } = useQuery({ queryKey: ["settings_one"], queryFn: settings_one });
+  const logoSrc =
+    settings?.logo_url && settings.logo_url.trim() !== ""
+      ? settings.logo_url
+      : "/assets/Full_Logo_hustlehub.png";
   const { data: clients = [] } = useQuery({ queryKey: ["clients_all"], queryFn: clients_all });
   const { data: clientDetails } = useQuery({ 
     queryKey: ["client_detail", invoice?.client_id], 
@@ -122,7 +126,7 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoice }: Invoic
           <div className="border-b-2 border-primary pb-6">
             <div className="mb-4">
               <img 
-                src={(settings as any)?.logo_url || "/assets/Full_Logo_hustlehub.png"} 
+                src={logoSrc}
                 alt="Company Logo" 
                 className="h-16"
               />
