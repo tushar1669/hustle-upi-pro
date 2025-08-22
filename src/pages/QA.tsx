@@ -30,6 +30,7 @@ import type { QATestResult } from '@/qa/localStorage';
 import type { TestRunSummary } from '@/qa/testRunner';
 import { smokeTestRunner, type SmokeTestSummary } from '@/qa/smokeTests';
 import { featureTestRunner, FEATURE_TESTS, type FeatureTestResult, type FeatureTestSummary } from '@/qa/featureTests';
+import { seedDemoData } from '@/qa/demoSeed';
 
 // Import Supabase and collections for demo data
 import { supabase } from '@/integrations/supabase/client';
@@ -45,6 +46,10 @@ export default function QA() {
   const [results, setResults] = useState<QATestResult[]>([]);
   const [summary, setSummary] = useState<TestRunSummary | null>(null);
   const [lastRunTime, setLastRunTime] = useState<string>('');
+  
+  // New QA Hub State
+  const [busy, setBusy] = useState(false);
+  const [sanityV2Summary, setSanityV2Summary] = useState<any>(null);
   
   // Test Runner State
   const [isSeeding, setIsSeeding] = useState(false);
@@ -476,6 +481,33 @@ export default function QA() {
       title: 'Full Report Exported',
       description: 'Complete QA and smoke test report downloaded successfully'
     });
+  };
+
+  // New QA Hub Handlers
+  const handleSeed = async () => {
+    try {
+      setBusy(true);
+      await seedDemoData();
+      await loadDemoDataCounts();
+      toast({ title: "Demo data populated", description: "Clients, invoices, tasks, reminders seeded." });
+    } catch (e: any) {
+      toast({ title: "Seeding failed", description: e?.message ?? "Unknown error", variant: "destructive" });
+    } finally { 
+      setBusy(false); 
+    }
+  };
+
+  const handleRunSanityV2 = async () => {
+    try {
+      setBusy(true);
+      const s = await qaTestRunner.runSanityV2({ fix: false });
+      setSanityV2Summary(s);
+      toast({ title: "Sanity v2 completed", description: `${s.passed}/${s.totalTests} passed • ${s.failed} failed • ${s.warnings} warnings` });
+    } catch (e: any) {
+      toast({ title: "Sanity v2 failed", description: e?.message ?? "Unknown error", variant: "destructive" });
+    } finally { 
+      setBusy(false); 
+    }
   };
 
   const populateDemoData = async () => {
@@ -970,8 +1002,18 @@ export default function QA() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {/* Action Buttons */}
-              <div className="flex items-center gap-3 flex-wrap">
+              {/* New QA Hub Buttons */}
+              <div className="flex gap-3">
+                <Button onClick={handleSeed} disabled={busy}>
+                  Populate Demo Data
+                </Button>
+                <Button onClick={handleRunSanityV2} variant="secondary" disabled={busy}>
+                  Run Sanity v2
+                </Button>
+              </div>
+
+              {/* Legacy Action Buttons */}
+              <div className="flex items-center gap-3 flex-wrap border-t pt-4">
                 <Button 
                   onClick={handleSeedIfNeeded} 
                   disabled={isSeeding || isRunning || isRunningSmokeTests}
@@ -1152,6 +1194,42 @@ export default function QA() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Sanity v2 Results Table */}
+        {sanityV2Summary && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Sanity v2 Test Results</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto border rounded">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted/30">
+                      <th className="py-2 px-3 text-left">Test</th>
+                      <th className="py-2 px-3 text-left">Status</th>
+                      <th className="py-2 px-3 text-left">Notes</th>
+                      <th className="py-2 px-3 text-left">Time (ms)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sanityV2Summary.results.map((r: any) => (
+                      <tr key={r.id} className="border-t">
+                        <td className="py-2 px-3">{r.name}</td>
+                        <td className="py-2 px-3">{r.pass ? "✅ Pass" : "❌ Fail"}</td>
+                        <td className="py-2 px-3">{r.notes ?? "-"}</td>
+                        <td className="py-2 px-3">{r.executionTime}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="text-xs text-muted-foreground p-3">
+                  Executed at: {new Date(sanityV2Summary.executedAt).toLocaleString()}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Demo Data Management Panel */}
         <Card>
