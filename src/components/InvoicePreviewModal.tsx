@@ -101,6 +101,7 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoice }: Invoic
               Print
             </Button>
             <Button 
+              data-testid="invoice-pdf-btn"
               variant="outline" 
               size="sm" 
               onClick={handleDownload}

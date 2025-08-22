@@ -132,6 +132,7 @@ const Index = () => {
                     variant="outline" 
                     onClick={() => setQuickFollowupModal(true)}
                     className="h-6 px-2 text-xs"
+                    data-testid="create-followup"
                   >
                     <Send className="h-3 w-3 mr-1" />
                     Create Follow-up

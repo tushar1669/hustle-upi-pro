@@ -143,7 +143,7 @@ export default function QuickActionsWidget() {
             <Users className="h-4 w-4 mr-2" />
             Add Client
           </Button>
-          <Button variant="outline" onClick={handleCreateFollowUp} className="h-12">
+          <Button variant="outline" onClick={handleCreateFollowUp} className="h-12" data-testid="create-followup">
             <Plus className="h-4 w-4 mr-2" />
             Create Follow-up
           </Button>
@@ -281,18 +281,6 @@ export default function QuickActionsWidget() {
           </div>
         </div>
 
-        {/* QA Testing Section */}
-        <div className="pt-4 border-t">
-          <Button 
-            onClick={handleRunSanityV2} 
-            variant="outline" 
-            size="sm"
-            className="w-full h-auto flex items-center gap-2 p-3 text-xs"
-          >
-            <TestTube className="w-4 h-4" />
-            <span>Run QA (Sanity v2)</span>
-          </Button>
-        </div>
       </CardContent>
       
       <AddTaskModal 

@@ -237,6 +237,7 @@ Thank you!`;
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem 
+                                data-testid="invoice-menu-preview"
                                 onClick={() => {
                                   setSelectedPreviewInvoice(invoice);
                                   setShowPreviewModal(true);
@@ -267,7 +268,10 @@ Thank you!`;
                               )}
                               
                               {invoice.status === "draft" && (
-                                <DropdownMenuItem onClick={() => navigate(`/invoices/edit/${invoice.id}`)}>
+                                <DropdownMenuItem 
+                                  data-testid="invoice-menu-edit"
+                                  onClick={() => navigate(`/invoices/edit/${invoice.id}`)}
+                                >
                                   <Edit className="mr-2 h-4 w-4" />
                                   Edit
                                 </DropdownMenuItem>

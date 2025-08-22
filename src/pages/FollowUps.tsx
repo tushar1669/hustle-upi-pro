@@ -379,7 +379,7 @@ export default function FollowUps() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Follow-ups Worklist</h1>
         <div className="flex gap-2">
-          <Button onClick={() => setQuickFollowupModal(true)} className="gap-2">
+          <Button onClick={() => setQuickFollowupModal(true)} className="gap-2" data-testid="create-followup">
             <Send className="h-4 w-4" />
             Create Follow-up
           </Button>
