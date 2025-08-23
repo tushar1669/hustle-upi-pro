@@ -2,23 +2,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
-import {
-  Plus,
-  FileText,
-  Users,
-  CheckSquare,
-  DollarSign,
-  TestTube,
-} from "lucide-react";
+import { Plus, FileText, Users, CheckSquare, DollarSign, TestTube } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  clients_all,
-  tasks_all,
-  invoices_all,
-  v_dashboard_metrics,
-  update_task,
-  create_message_log,
-} from "@/data/collections";
+import { clients_all, tasks_all, invoices_all, v_dashboard_metrics, update_task, create_message_log } from "@/data/collections";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import AddTaskModal from "@/components/AddTaskModal";
@@ -33,65 +19,54 @@ export default function QuickActionsWidget() {
   const queryClient = useQueryClient();
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
 
-  const { data: clients = [], isLoading: clientsLoading } = useQuery({
-    queryKey: CACHE_KEYS.CLIENTS,
-    queryFn: clients_all,
+  const { data: clients = [], isLoading: clientsLoading } = useQuery({ 
+    queryKey: CACHE_KEYS.CLIENTS, 
+    queryFn: clients_all 
   });
-
-  const { data: tasks = [], isLoading: tasksLoading } = useQuery({
-    queryKey: CACHE_KEYS.TASKS,
-    queryFn: tasks_all,
+  
+  const { data: tasks = [], isLoading: tasksLoading } = useQuery({ 
+    queryKey: CACHE_KEYS.TASKS, 
+    queryFn: tasks_all 
   });
-
-  const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
-    queryKey: CACHE_KEYS.INVOICES,
-    queryFn: invoices_all,
+  
+  const { data: invoices = [], isLoading: invoicesLoading } = useQuery({ 
+    queryKey: CACHE_KEYS.INVOICES, 
+    queryFn: invoices_all 
   });
-
-  const { data: dashboardMetrics } = useQuery({
-    queryKey: CACHE_KEYS.DASHBOARD,
-    queryFn: v_dashboard_metrics,
+  
+  const { data: dashboardMetrics } = useQuery({ 
+    queryKey: CACHE_KEYS.DASHBOARD, 
+    queryFn: v_dashboard_metrics 
   });
 
   // Filter data for display
   const recentClients = clients.slice(0, 5).reverse();
-
+  
   const today = new Date();
   const sevenDaysFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
   const openTasks = tasks
-    .filter(
-      (t: any) =>
-        t.status === "open" &&
-        t.due_date &&
-        new Date(t.due_date) <= sevenDaysFromNow
-    )
-    .sort(
-      (a: any, b: any) =>
-        new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
-    )
+    .filter((t: any) => t.status === 'open' && t.due_date && new Date(t.due_date) <= sevenDaysFromNow)
+    .sort((a: any, b: any) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
     .slice(0, 5);
-
+    
   const recentInvoices = invoices.slice(0, 5).reverse();
-
+  
   const recentPayments = invoices
     .filter((i: any) => i.status === "paid" && i.paid_date)
-    .sort(
-      (a: any, b: any) =>
-        new Date(b.paid_date).getTime() - new Date(a.paid_date).getTime()
-    )
+    .sort((a: any, b: any) => new Date(b.paid_date).getTime() - new Date(a.paid_date).getTime())
     .slice(0, 5);
 
   const thisMonthPaid = dashboardMetrics?.this_month_paid || 0;
 
   const handleMarkTaskDone = async (taskId: string) => {
     try {
-      await update_task(taskId, { status: "done" });
+      await update_task(taskId, { status: 'done' });
       await create_message_log({
-        related_type: "task",
+        related_type: 'task',
         related_id: taskId,
-        channel: "whatsapp",
-        template_used: "task_completed",
-        outcome: "ok",
+        channel: 'whatsapp',
+        template_used: 'task_completed',
+        outcome: 'ok'
       });
       await invalidateTaskCaches(queryClient);
       toast({ title: "Task marked as done" });
@@ -116,11 +91,10 @@ export default function QuickActionsWidget() {
     navigate("/follow-ups");
   };
 
-  // Leave QA button out for simplicity; tests run via /qa page
   const handleRunSanityV2 = async () => {
     try {
       const summary = await qaTestRunner.runSanityV2({ fix: false });
-
+      
       // Show toast with results
       toast({
         title: "QA completed",
@@ -130,12 +104,13 @@ export default function QuickActionsWidget() {
 
       // Add recent activity entry
       await create_message_log({
-        related_type: "qa" as any,
+        related_type: 'qa' as any,
         related_id: crypto.randomUUID(),
-        channel: "email" as any,
-        template_used: "qa_check",
-        outcome: `Sanity V2: ${summary.passed}/${summary.totalTests} passed`,
+        channel: 'email' as any,
+        template_used: 'qa_check',
+        outcome: `Sanity V2: ${summary.passed}/${summary.totalTests} passed`
       });
+
     } catch (error) {
       toast({
         title: "QA failed",
@@ -164,21 +139,11 @@ export default function QuickActionsWidget() {
             <CheckSquare className="h-4 w-4 mr-2" />
             Add Task
           </Button>
-          <Button
-            variant="outline"
-            onClick={handleAddClient}
-            className="h-12"
-          >
+          <Button variant="outline" onClick={handleAddClient} className="h-12">
             <Users className="h-4 w-4 mr-2" />
             Add Client
           </Button>
-          {/* The follow-up button with qa-friendly selector */}
-          <Button
-            variant="outline"
-            onClick={handleCreateFollowUp}
-            className="h-12"
-            data-testid="create-followup"
-          >
+          <Button variant="outline" onClick={handleCreateFollowUp} className="h-12" data-testid="create-followup">
             <Plus className="h-4 w-4 mr-2" />
             Create Follow-up
           </Button>
@@ -193,11 +158,7 @@ export default function QuickActionsWidget() {
                 <Users className="h-4 w-4" />
                 Recent Clients
               </h4>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate("/clients")}
-              >
+              <Button variant="ghost" size="sm" onClick={() => navigate("/clients")}>
                 View All
               </Button>
             </div>
@@ -208,14 +169,9 @@ export default function QuickActionsWidget() {
                 <div className="text-sm text-muted-foreground">No clients yet</div>
               ) : (
                 recentClients.map((client: any) => (
-                  <div
-                    key={client.id}
-                    className="flex items-center justify-between py-1 px-2 rounded hover:bg-muted/50"
-                  >
+                  <div key={client.id} className="flex items-center justify-between py-1 px-2 rounded hover:bg-muted/50">
                     <span className="text-sm">{client.name}</span>
-                    <Badge variant="outline" className="text-xs">
-                      {client.whatsapp}
-                    </Badge>
+                    <Badge variant="outline" className="text-xs">{client.whatsapp}</Badge>
                   </div>
                 ))
               )}
@@ -229,11 +185,7 @@ export default function QuickActionsWidget() {
                 <CheckSquare className="h-4 w-4" />
                 Open Tasks
               </h4>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate("/tasks")}
-              >
+              <Button variant="ghost" size="sm" onClick={() => navigate("/tasks")}>
                 View All
               </Button>
             </div>
@@ -244,10 +196,7 @@ export default function QuickActionsWidget() {
                 <div className="text-sm text-muted-foreground">No tasks due</div>
               ) : (
                 openTasks.map((task: any) => (
-                  <div
-                    key={task.id}
-                    className="flex items-center justify-between py-1 px-2 rounded hover:bg-muted/50"
-                  >
+                  <div key={task.id} className="flex items-center justify-between py-1 px-2 rounded hover:bg-muted/50">
                     <div className="flex-1">
                       <span className="text-sm">{task.title}</span>
                       {task.due_date && (
@@ -257,20 +206,17 @@ export default function QuickActionsWidget() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge
-                        variant={task.is_billable ? "default" : "secondary"}
-                        className="text-xs"
-                      >
+                      <Badge variant={task.is_billable ? "default" : "secondary"} className="text-xs">
                         {task.is_billable ? "₹" : "Free"}
                       </Badge>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleMarkTaskDone(task.id)}
-                          className="h-6 px-2 text-xs"
-                        >
-                          Done
-                        </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        onClick={() => handleMarkTaskDone(task.id)}
+                        className="h-6 px-2 text-xs"
+                      >
+                        Done
+                      </Button>
                     </div>
                   </div>
                 ))
@@ -285,11 +231,7 @@ export default function QuickActionsWidget() {
                 <FileText className="h-4 w-4" />
                 Recent Invoices
               </h4>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate("/invoices")}
-              >
+              <Button variant="ghost" size="sm" onClick={() => navigate("/invoices")}>
                 View All
               </Button>
             </div>
@@ -300,21 +242,9 @@ export default function QuickActionsWidget() {
                 <div className="text-sm text-muted-foreground">No invoices yet</div>
               ) : (
                 recentInvoices.map((invoice: any) => (
-                  <div
-                    key={invoice.id}
-                    className="flex items-center justify-between py-1 px-2 rounded hover:bg-muted/50"
-                  >
+                  <div key={invoice.id} className="flex items-center justify-between py-1 px-2 rounded hover:bg-muted/50">
                     <span className="text-sm">{invoice.invoice_number}</span>
-                    <Badge
-                      variant={
-                        invoice.status === "paid"
-                          ? "secondary"
-                          : invoice.status === "overdue"
-                          ? "destructive"
-                          : "default"
-                      }
-                      className="text-xs"
-                    >
+                    <Badge variant={invoice.status === "paid" ? "secondary" : invoice.status === "overdue" ? "destructive" : "default"} className="text-xs">
                       {currency(invoice.total_amount)}
                     </Badge>
                   </div>
@@ -330,9 +260,7 @@ export default function QuickActionsWidget() {
                 <DollarSign className="h-4 w-4" />
                 Recent Payments
               </h4>
-              <span className="text-xs text-muted-foreground">
-                {currency(thisMonthPaid)} this month
-              </span>
+              <span className="text-xs text-muted-foreground">{currency(thisMonthPaid)} this month</span>
             </div>
             <div className="space-y-1">
               {invoicesLoading ? (
@@ -341,10 +269,7 @@ export default function QuickActionsWidget() {
                 <div className="text-sm text-muted-foreground">No payments yet</div>
               ) : (
                 recentPayments.map((payment: any) => (
-                  <div
-                    key={payment.id}
-                    className="flex items-center justify-between py-1 px-2 rounded hover:bg-muted/50"
-                  >
+                  <div key={payment.id} className="flex items-center justify-between py-1 px-2 rounded hover:bg-muted/50">
                     <span className="text-sm">{payment.invoice_number}</span>
                     <Badge variant="secondary" className="text-xs">
                       {currency(payment.total_amount)}
@@ -355,9 +280,10 @@ export default function QuickActionsWidget() {
             </div>
           </div>
         </div>
-      </CardContent>
 
-      <AddTaskModal
+      </CardContent>
+      
+      <AddTaskModal 
         isOpen={isAddTaskModalOpen}
         onClose={() => setIsAddTaskModalOpen(false)}
         onSuccess={handleTaskCreated}
