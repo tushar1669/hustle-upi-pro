@@ -127,6 +127,17 @@ export async function delete_invoice(id: string) {
   return true;
 }
 
+// Add near other exports
+export async function invoice_with_items(invoiceId: string) {
+  const { data: inv, error } = await supabase
+    .from("invoices")
+    .select("*, clients:client_id(id,name,whatsapp), items:invoice_items(*)")
+    .eq("id", invoiceId)
+    .single();
+  if (error) throw error;
+  return inv;
+}
+
 // ============ Invoice Items ============
 export async function items_by_invoice(invoice_id: string) {
   const { data, error } = await supabase.from("invoice_items").select("*").eq("invoice_id", invoice_id).order("created_at", { ascending: true });

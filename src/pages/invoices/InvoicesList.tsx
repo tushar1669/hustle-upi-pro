@@ -18,9 +18,12 @@ import {
   update_invoice,
   create_message_log,
   reminders_by_invoice,
+  create_reminder,
   update_reminder,
   settings_one,
+  invoice_with_items,
 } from "@/data/collections";
+import { CACHE_KEYS, invalidateInvoiceCaches } from "@/hooks/useCache";
 import { useToast } from "@/hooks/use-toast";
 import { useCelebrationContext } from "@/components/CelebrationProvider";
 import InvoicePreviewModal from "@/components/InvoicePreviewModal";
@@ -50,10 +53,11 @@ export default function InvoicesList() {
 
   const filteredInvoices = invoices.filter((invoice: any) => {
     const matchesTab = activeTab === "all" || invoice.status === activeTab;
+    const searchLower = searchQuery.toLowerCase();
     const matchesSearch =
       !searchQuery ||
-      invoice.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      clientName(invoice.client_id).toLowerCase().includes(searchQuery.toLowerCase());
+      invoice.invoice_number.toLowerCase().includes(searchLower) ||
+      clientName(invoice.client_id).toLowerCase().includes(searchLower);
     return matchesTab && matchesSearch;
   });
 
@@ -99,8 +103,7 @@ export default function InvoicesList() {
         outcome: "updated",
       });
 
-      queryClient.invalidateQueries({ queryKey: ["invoices_all"] });
-      queryClient.invalidateQueries({ queryKey: ["v_dashboard_metrics"] });
+      await invalidateInvoiceCaches(queryClient);
 
       setShowMarkPaidModal(false);
       setSelectedInvoice(null);
@@ -159,8 +162,8 @@ Thank you!`;
           outcome: "sent",
         });
 
-        queryClient.invalidateQueries({ queryKey: ["all_reminders"] });
-        queryClient.invalidateQueries({ queryKey: ["message_log_recent"] });
+        queryClient.invalidateQueries({ queryKey: CACHE_KEYS.REMINDERS });
+        queryClient.invalidateQueries({ queryKey: CACHE_KEYS.MESSAGES });
 
         toast({ title: "Reminder sent successfully" });
         celebrate("reminder_sent");
@@ -169,6 +172,53 @@ Thank you!`;
       }
     } catch {
       toast({ title: "Error sending reminder", variant: "destructive" });
+    }
+  };
+
+  const handleSendInvoice = async (invoice: any) => {
+    try {
+      // Change status to sent
+      await update_invoice(invoice.id, { status: "sent" });
+
+      // Create follow-up reminders if missing  
+      const existingReminders = await reminders_by_invoice(invoice.id);
+      if (existingReminders.length === 0) {
+        const dueDate = new Date(invoice.due_date);
+        const reminderDate = new Date(dueDate.getTime() + 24 * 60 * 60 * 1000); // 1 day after due
+        
+        await create_reminder({
+          invoice_id: invoice.id,
+          scheduled_at: reminderDate.toISOString(),
+          channel: "whatsapp",
+          status: "pending"
+        });
+      }
+
+      // Add message log
+      await create_message_log({
+        related_type: "invoice",
+        related_id: invoice.id,
+        channel: "whatsapp",
+        template_used: "invoice_sent",
+        outcome: "sent"
+      });
+
+      await invalidateInvoiceCaches(queryClient);
+      
+      toast({ title: "Invoice sent successfully" });
+      celebrate("invoice_sent");
+    } catch {
+      toast({ title: "Error sending invoice", variant: "destructive" });
+    }
+  };
+
+  const handlePreview = async (invoice: any) => {
+    try {
+      const fullInvoiceData = await invoice_with_items(invoice.id);
+      setSelectedPreviewInvoice(fullInvoiceData);
+      setShowPreviewModal(true);
+    } catch {
+      toast({ title: "Error loading invoice data", variant: "destructive" });
     }
   };
 
@@ -256,10 +306,7 @@ Thank you!`;
                             <DropdownMenuContent align="end" data-testid="invoice-menu">
                               <DropdownMenuItem
                                 data-testid="invoice-menu-preview"
-                                onClick={() => {
-                                  setSelectedPreviewInvoice(invoice);
-                                  setShowPreviewModal(true);
-                                }}
+                                onClick={() => handlePreview(invoice)}
                               >
                                 <Eye className="mr-2 h-4 w-4" />
                                 Preview
@@ -296,7 +343,7 @@ Thank you!`;
                               )}
 
                               {invoice.status === "draft" && (
-                                <DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleSendInvoice(invoice)}>
                                   <Send className="mr-2 h-4 w-4" />
                                   Send Invoice
                                 </DropdownMenuItem>
