@@ -10,6 +10,7 @@ import NotFound from "./pages/NotFound";
 import AppLayout from "@/components/layout/AppLayout";
 import InvoicesList from "@/pages/invoices/InvoicesList";
 import CreateInvoice from "@/pages/invoices/CreateInvoice";
+import EditInvoice from "@/pages/invoices/EditInvoice";
 import Tasks from "./pages/Tasks";
 import Clients from "./pages/Clients";
 import Projects from "./pages/Projects";
@@ -53,6 +54,7 @@ const App = () => (
               <Route index element={<Index />} />
               <Route path="invoices" element={<InvoicesList />} />
               <Route path="invoices/new" element={<CreateInvoice />} />
+              <Route path="invoices/edit/:id" element={<EditInvoice />} />
               <Route path="tasks" element={<Tasks />} />
               <Route path="clients" element={<Clients />} />
               <Route path="projects" element={<Projects />} />
