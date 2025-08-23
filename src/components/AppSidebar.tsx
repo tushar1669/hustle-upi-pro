@@ -49,7 +49,7 @@ export function AppSidebar() {
       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2",
       isActive
         ? "bg-orange-600 text-white font-semibold border-r-2 border-r-orange-500 qa-active"
-        : "bg-emerald-500 text-white hover:bg-orange-500",
+        : "bg-emerald-500/15 text-emerald-700 hover:text-white hover:bg-orange-500",
       // keep height + spacing consistent
       "h-10 px-3",
     ].join(" ");
