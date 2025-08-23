@@ -12,7 +12,15 @@ import { useState } from "react";
 import { Plus, MoreHorizontal, Eye, Send, MessageSquare, Edit, DollarSign } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { invoices_all, clients_all, update_invoice, create_message_log, reminders_by_invoice, update_reminder, settings_one } from "@/data/collections";
+import {
+  invoices_all,
+  clients_all,
+  update_invoice,
+  create_message_log,
+  reminders_by_invoice,
+  update_reminder,
+  settings_one,
+} from "@/data/collections";
 import { useToast } from "@/hooks/use-toast";
 import { useCelebrationContext } from "@/components/CelebrationProvider";
 import InvoicePreviewModal from "@/components/InvoicePreviewModal";
@@ -29,7 +37,7 @@ export default function InvoicesList() {
   const { data: settings } = useQuery({ queryKey: ["settings_one"], queryFn: settings_one });
   const { celebrate } = useCelebrationContext();
 
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState<"all" | "draft" | "sent" | "overdue" | "paid">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showMarkPaidModal, setShowMarkPaidModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
@@ -42,7 +50,8 @@ export default function InvoicesList() {
 
   const filteredInvoices = invoices.filter((invoice: any) => {
     const matchesTab = activeTab === "all" || invoice.status === activeTab;
-    const matchesSearch = !searchQuery || 
+    const matchesSearch =
+      !searchQuery ||
       invoice.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
       clientName(invoice.client_id).toLowerCase().includes(searchQuery.toLowerCase());
     return matchesTab && matchesSearch;
@@ -50,11 +59,16 @@ export default function InvoicesList() {
 
   const getStatusVariant = (status: string) => {
     switch (status) {
-      case "paid": return "secondary";
-      case "overdue": return "destructive";
-      case "sent": return "default";
-      case "draft": return "outline";
-      default: return "outline";
+      case "paid":
+        return "secondary";
+      case "overdue":
+        return "destructive";
+      case "sent":
+        return "default";
+      case "draft":
+        return "outline";
+      default:
+        return "outline";
     }
   };
 
@@ -64,6 +78,7 @@ export default function InvoicesList() {
     const dueDate = new Date(due_date);
     const diffTime = today.getTime() - dueDate.getTime();
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    // Positive => overdue, negative => days left
   };
 
   const handleMarkPaid = async () => {
@@ -71,30 +86,30 @@ export default function InvoicesList() {
 
     try {
       await update_invoice(selectedInvoice.id, {
-        status: 'paid',
+        status: "paid",
         paid_date: new Date(paidDate).toISOString(),
-        utr_reference: utrReference || null
+        utr_reference: utrReference || null,
       });
 
       await create_message_log({
-        related_type: 'invoice',
+        related_type: "invoice",
         related_id: selectedInvoice.id,
-        channel: 'whatsapp',
-        template_used: 'invoice_paid',
-        outcome: 'updated'
+        channel: "whatsapp",
+        template_used: "invoice_paid",
+        outcome: "updated",
       });
 
       queryClient.invalidateQueries({ queryKey: ["invoices_all"] });
       queryClient.invalidateQueries({ queryKey: ["v_dashboard_metrics"] });
-      
+
       setShowMarkPaidModal(false);
       setSelectedInvoice(null);
       setPaidDate("");
       setUtrReference("");
-      
+
       toast({ title: "Invoice marked as paid" });
-      celebrate('mark_paid');
-    } catch (error) {
+      celebrate("mark_paid");
+    } catch {
       toast({ title: "Error updating invoice", variant: "destructive" });
     }
   };
@@ -104,17 +119,24 @@ export default function InvoicesList() {
     if (!client || !settings) return;
 
     try {
-      // Get pending reminders for this invoice
       const reminders = await reminders_by_invoice(invoice.id);
-      const pendingReminder = reminders.find((r: any) => r.status === 'pending');
+      const pendingReminder = reminders.find((r: any) => r.status === "pending");
 
       if (pendingReminder) {
         const daysOverdue = getDaysOverdue(invoice.due_date, invoice.status);
-        const upiLink = `upi://pay?pa=${settings.upi_vpa}&pn=${encodeURIComponent(settings.creator_display_name)}&am=${invoice.total_amount}&tn=INV%20${invoice.invoice_number}`;
-        
+        const upiLink = `upi://pay?pa=${settings.upi_vpa}&pn=${encodeURIComponent(
+          settings.creator_display_name
+        )}&am=${invoice.total_amount}&tn=INV%20${invoice.invoice_number}`;
+
         const message = `Hi ${client.name},
 
-This is a friendly reminder that Invoice ${invoice.invoice_number} for ${currency(invoice.total_amount)} is ${daysOverdue > 0 ? `${daysOverdue} days overdue` : `due on ${new Date(invoice.due_date).toLocaleDateString()}`}.
+This is a friendly reminder that Invoice ${invoice.invoice_number} for ${currency(
+          invoice.total_amount
+        )} is ${
+          daysOverdue > 0
+            ? `${daysOverdue} days overdue`
+            : `due on ${new Date(invoice.due_date).toLocaleDateString()}`
+        }.
 
 Please make the payment at your earliest convenience.
 
@@ -122,30 +144,30 @@ UPI Link: ${upiLink}
 
 Thank you!`;
 
-        const whatsappUrl = `https://wa.me/${client.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
-        window.open(whatsappUrl, '_blank');
+        const whatsappUrl = `https://wa.me/${client.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(
+          message
+        )}`;
+        window.open(whatsappUrl, "_blank");
 
-        // Update reminder status
-        await update_reminder(pendingReminder.id, { status: 'sent' });
-        
-        // Log the reminder
+        await update_reminder(pendingReminder.id, { status: "sent" });
+
         await create_message_log({
-          related_type: 'invoice',
+          related_type: "invoice",
           related_id: invoice.id,
-          channel: 'whatsapp',
-          template_used: 'reminder_sent',
-          outcome: 'sent'
+          channel: "whatsapp",
+          template_used: "reminder_sent",
+          outcome: "sent",
         });
 
         queryClient.invalidateQueries({ queryKey: ["all_reminders"] });
         queryClient.invalidateQueries({ queryKey: ["message_log_recent"] });
-        
+
         toast({ title: "Reminder sent successfully" });
-        celebrate('reminder_sent');
+        celebrate("reminder_sent");
       } else {
         toast({ title: "No pending reminders for this invoice", variant: "destructive" });
       }
-    } catch (error) {
+    } catch {
       toast({ title: "Error sending reminder", variant: "destructive" });
     }
   };
@@ -153,7 +175,7 @@ Thank you!`;
   return (
     <div className="space-y-6">
       <SEO title="HustleHub — Invoices" description="Manage all your invoices with filtering and search capabilities." />
-      
+
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Invoices</h1>
         <Button onClick={() => navigate("/invoices/new")}>
@@ -167,7 +189,7 @@ Thank you!`;
           <CardTitle>All Invoices</CardTitle>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
               <TabsList>
                 <TabsTrigger value="all">All</TabsTrigger>
@@ -176,7 +198,7 @@ Thank you!`;
                 <TabsTrigger value="overdue">Overdue</TabsTrigger>
                 <TabsTrigger value="paid">Paid</TabsTrigger>
               </TabsList>
-              
+
               <Input
                 placeholder="Search invoices..."
                 value={searchQuery}
@@ -201,20 +223,16 @@ Thank you!`;
                 <TableBody>
                   {filteredInvoices.map((invoice: any) => {
                     const daysOverdue = getDaysOverdue(invoice.due_date, invoice.status);
-                    
+
                     return (
-                      <TableRow key={invoice.id}>
+                      <TableRow key={invoice.id} data-testid={`invoice-row-${invoice.id}`}>
                         <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
                         <TableCell>{clientName(invoice.client_id)}</TableCell>
                         <TableCell className="text-right">{currency(invoice.total_amount)}</TableCell>
                         <TableCell>
-                          <Badge variant={getStatusVariant(invoice.status)}>
-                            {invoice.status}
-                          </Badge>
+                          <Badge variant={getStatusVariant(invoice.status)}>{invoice.status}</Badge>
                         </TableCell>
-                        <TableCell>
-                          {new Date(invoice.due_date).toLocaleDateString()}
-                        </TableCell>
+                        <TableCell>{new Date(invoice.due_date).toLocaleDateString()}</TableCell>
                         <TableCell>
                           {daysOverdue > 0 && invoice.status !== "paid" ? (
                             <Badge variant="destructive" className="text-xs">
@@ -231,12 +249,12 @@ Thank you!`;
                         <TableCell>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="h-8 w-8 p-0">
+                              <Button variant="ghost" className="h-8 w-8 p-0" data-testid="invoice-menu-trigger">
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem 
+                            <DropdownMenuContent align="end" data-testid="invoice-menu">
+                              <DropdownMenuItem
                                 data-testid="invoice-menu-preview"
                                 onClick={() => {
                                   setSelectedPreviewInvoice(invoice);
@@ -246,12 +264,12 @@ Thank you!`;
                                 <Eye className="mr-2 h-4 w-4" />
                                 Preview
                               </DropdownMenuItem>
-                              
+
                               {invoice.status !== "paid" && (
-                                <DropdownMenuItem 
+                                <DropdownMenuItem
                                   onClick={() => {
                                     setSelectedInvoice(invoice);
-                                    setPaidDate(new Date().toISOString().split('T')[0]);
+                                    setPaidDate(new Date().toISOString().split("T")[0]);
                                     setShowMarkPaidModal(true);
                                   }}
                                 >
@@ -259,16 +277,16 @@ Thank you!`;
                                   Mark as Paid
                                 </DropdownMenuItem>
                               )}
-                              
+
                               {(invoice.status === "sent" || invoice.status === "overdue") && (
                                 <DropdownMenuItem onClick={() => handleSendReminder(invoice)}>
                                   <MessageSquare className="mr-2 h-4 w-4" />
                                   Send Reminder
                                 </DropdownMenuItem>
                               )}
-                              
+
                               {invoice.status === "draft" && (
-                                <DropdownMenuItem 
+                                <DropdownMenuItem
                                   data-testid="invoice-menu-edit"
                                   onClick={() => navigate(`/invoices/edit/${invoice.id}`)}
                                 >
@@ -276,7 +294,7 @@ Thank you!`;
                                   Edit
                                 </DropdownMenuItem>
                               )}
-                              
+
                               {invoice.status === "draft" && (
                                 <DropdownMenuItem>
                                   <Send className="mr-2 h-4 w-4" />
