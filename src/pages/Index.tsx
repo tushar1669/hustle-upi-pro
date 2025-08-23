@@ -124,21 +124,7 @@ const Index = () => {
                 <div className="text-2xl font-bold text-danger">{currency(overdueAmount)}</div>
                 <Badge variant="danger" className="text-xs">{overdueCount} invoices</Badge>
               </div>
-              <div className="flex items-center justify-between mt-2">
-                <p className="text-xs text-muted-foreground">needs attention</p>
-                {overdueCount > 0 && (
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={() => setQuickFollowupModal(true)}
-                    className="h-6 px-2 text-xs"
-                    data-testid="create-followup"
-                  >
-                    <Send className="h-3 w-3 mr-1" />
-                    Create Follow-up
-                  </Button>
-                )}
-              </div>
+              <p className="text-xs text-muted-foreground mt-2">needs attention</p>
             </CardContent>
           </Card>
 
@@ -190,7 +176,7 @@ const Index = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Button 
                 onClick={() => navigate("/invoices/new")}
                 className="h-20 text-left flex-col items-start justify-center"
@@ -222,6 +208,18 @@ const Index = () => {
                 <div>
                   <p className="font-medium">Add Client</p>
                   <p className="text-xs text-muted-foreground">Expand your network</p>
+                </div>
+              </Button>
+              <Button 
+                onClick={() => setQuickFollowupModal(true)}
+                className="h-20 text-left flex-col items-start justify-center"
+                variant="outline"
+                data-testid="create-followup"
+              >
+                <Send className="w-6 h-6 mb-2 text-blue-500" />
+                <div>
+                  <p className="font-medium">Create Follow-up</p>
+                  <p className="text-xs text-muted-foreground">Send payment reminders</p>
                 </div>
               </Button>
             </div>
