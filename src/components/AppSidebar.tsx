@@ -1,3 +1,4 @@
+// src/components/AppSidebar.tsx
 import { NavLink } from "react-router-dom";
 import {
   Home,
@@ -38,13 +39,19 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
 
+  // Theme:
+  // - Inactive: bg-emerald-500 text-white
+  // - Hover (inactive): bg-orange-500 text-white
+  // - Active: bg-orange-600 text-white + orange right border
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
     [
-      "w-full flex items-center",
+      "w-full flex items-center rounded-md transition-colors",
       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2",
       isActive
-        ? "bg-orange-50 text-orange-500 font-medium border-r-2 border-r-orange-500 qa-active"
-        : "hover:bg-orange-50 hover:text-orange-500 transition-colors",
+        ? "bg-orange-600 text-white font-semibold border-r-2 border-r-orange-500 qa-active"
+        : "bg-emerald-500 text-white hover:bg-orange-500",
+      // keep height + spacing consistent
+      "h-10 px-3",
     ].join(" ");
 
   return (
