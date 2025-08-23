@@ -39,7 +39,7 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
 
-  // Append qa‑active when the nav item matches the current route
+  // Append qa-active class when isActive is true, keep focus-visible styles
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
     (isActive
       ? "bg-orange-50 text-orange-500 font-medium border-r-2 border-r-orange-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
@@ -58,14 +58,11 @@ export function AppSidebar() {
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    {/* Add data-testid for QA and keep end to match exact path */}
                     <NavLink
                       to={item.url}
                       end
                       className={getNavCls}
-                      data-testid={`nav-${
-                        item.url.replace("/", "") || "dashboard"
-                      }`}
+                      data-testid={`nav-${item.url.replace("/", "") || "dashboard"}`}
                     >
                       <item.icon className="mr-3 h-5 w-5" />
                       {!collapsed && (
