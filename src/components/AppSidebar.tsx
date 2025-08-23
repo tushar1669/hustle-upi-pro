@@ -1,5 +1,15 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Users, FolderKanban, ListChecks, FileText, Target, Settings, FilePlus2, Bell } from "lucide-react";
+import {
+  Home,
+  Users,
+  FolderKanban,
+  ListChecks,
+  FileText,
+  Target,
+  Settings,
+  FilePlus2,
+  Bell,
+} from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -30,24 +40,41 @@ export function AppSidebar() {
   const location = useLocation();
   const currentPath = location.pathname;
 
+  // Keep your current styling; append a QA hook when active
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
-    isActive 
-      ? "bg-orange-50 text-orange-500 font-medium border-r-2 border-r-orange-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2" 
-      : "hover:bg-orange-50 hover:text-orange-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2";
+    (isActive
+      ? "bg-orange-50 text-orange-500 font-medium border-r-2 border-r-orange-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
+      : "hover:bg-orange-50 hover:text-orange-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2") +
+    (isActive ? " qa-active" : "");
 
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-primary font-semibold">HustleHub</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-primary font-semibold">
+            HustleHub
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <NavLink to={item.url} end className={getNavCls}>
+                    <NavLink
+                      to={item.url}
+                      end
+                      className={getNavCls}
+                      // Stable test id for QA (e.g., nav-dashboard, nav-invoicesnew)
+                      data-testid={`nav-${
+                        item.url.replace(/\//g, "") || "dashboard"
+                      }`}
+                      aria-current={
+                        currentPath === item.url ? "page" : undefined
+                      }
+                    >
                       <item.icon className="mr-3 h-5 w-5" />
-                      {!collapsed && <span className="font-medium">{item.title}</span>}
+                      {!collapsed && (
+                        <span className="font-medium">{item.title}</span>
+                      )}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
