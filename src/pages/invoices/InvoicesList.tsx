@@ -335,7 +335,7 @@ Thank you!`;
                               {invoice.status === "draft" && (
                                 <DropdownMenuItem
                                   data-testid="invoice-menu-edit"
-                                  onClick={() => navigate(`/invoices/edit/${invoice.id}`)}
+                                  onClick={() => navigate(`/invoices/edit/${invoice.id}/edit`)}
                                 >
                                   <Edit className="mr-2 h-4 w-4" />
                                   Edit
