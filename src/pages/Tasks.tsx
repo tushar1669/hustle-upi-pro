@@ -1,75 +1,109 @@
+import { useEffect, useMemo, useState } from "react";
 import SEO from "@/components/SEO";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useState } from "react";
-import { Plus, List, LayoutGrid, Filter, Search, Edit, CalendarIcon } from "lucide-react";
+import { CalendarIcon, Edit3, List, Layout, Check } from "lucide-react";
+
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { tasks_all, projects_all, clients_all, update_task, create_message_log } from "@/data/collections";
 import { useToast } from "@/hooks/use-toast";
-import { CACHE_KEYS } from "@/hooks/useCache";
 import AddTaskModal from "@/components/AddTaskModal";
-import { useNavigate } from "react-router-dom";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
-import { 
-  DndContext, 
-  DragEndEvent, 
-  DragOverlay, 
+
+import {
+  tasks_all,
+  projects_all,
+  clients_all,
+  update_task,
+  create_message_log,
+} from "@/data/collections";
+
+import { CACHE_KEYS } from "@/hooks/useCache";
+
+// dnd-kit
+import {
+  DndContext,
+  closestCenter,
+  DragEndEvent,
   DragStartEvent,
   PointerSensor,
   useSensor,
   useSensors,
-  closestCenter
 } from "@dnd-kit/core";
-import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useDroppable } from "@dnd-kit/core";
 
-// Task Edit Modal Component
-const TaskEditModal = ({ 
-  isOpen, 
-  onClose, 
-  task, 
-  onSaved 
-}: { 
-  isOpen: boolean; 
-  onClose: () => void; 
-  task: any; 
-  onSaved: () => void; 
-}) => {
-  const [title, setTitle] = useState(task?.title || "");
-  const [dueDate, setDueDate] = useState<Date | undefined>(task?.due_date ? new Date(task.due_date) : undefined);
-  const [isBillable, setIsBillable] = useState(task?.is_billable || false);
-  const [saving, setSaving] = useState(false);
+// -----------------------------------------------------------
+// Helpers / types (keep types broad to avoid ripple TS errors)
+// -----------------------------------------------------------
+
+type TaskItem = {
+  id: string;
+  title: string;
+  status: "open" | "done" | string;
+  project_id?: string | null;
+  due_date?: string | null;
+  is_billable?: boolean | null;
+};
+
+type ProjectItem = { id: string; name: string; client_id?: string | null };
+type ClientItem = { id: string; name: string };
+
+// -----------------------------------------------------------
+// Inline Task Edit Modal (no new file)
+// -----------------------------------------------------------
+function TaskEditModal({
+  isOpen,
+  onClose,
+  task,
+  onSaved,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  task: TaskItem | null;
+  onSaved: () => void;
+}) {
   const { toast } = useToast();
+  const [title, setTitle] = useState("");
+  const [dueDate, setDueDate] = useState<string>("");
+  const [isBillable, setIsBillable] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (task) {
+      setTitle(task.title || "");
+      setDueDate(task.due_date ? task.due_date.split("T")[0] : "");
+      setIsBillable(!!task.is_billable);
+    }
+  }, [task]);
 
   const handleSave = async () => {
     if (!task) return;
-    
     setSaving(true);
     try {
       await update_task(task.id, {
         title,
-        due_date: dueDate ? dueDate.toISOString().split('T')[0] : null,
-        is_billable: isBillable
-      });
-      
+        due_date: dueDate ? new Date(dueDate).toISOString() : null,
+        is_billable: isBillable,
+      } as any);
       toast({ title: "Task updated" });
       onSaved();
       onClose();
-    } catch (error: any) {
-      toast({ 
-        title: "Error updating task", 
-        description: error.message, 
-        variant: "destructive" 
+    } catch (e: any) {
+      toast({
+        title: "Error updating task",
+        description: e?.message ?? "Unknown error",
+        variant: "destructive",
       });
     } finally {
       setSaving(false);
@@ -77,420 +111,317 @@ const TaskEditModal = ({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(v) => !v && onClose()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Edit Task</DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-4">
           <div>
-            <Label htmlFor="title">Title</Label>
+            <Label htmlFor="t-title">Title</Label>
             <Input
-              id="title"
+              id="t-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Task title"
             />
           </div>
-          
+
           <div>
-            <Label>Due Date</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !dueDate && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dueDate ? format(dueDate, "PPP") : "Pick a date"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={dueDate}
-                  onSelect={setDueDate}
-                  initialFocus
-                  className="p-3 pointer-events-auto"
-                />
-              </PopoverContent>
-            </Popover>
+            <Label htmlFor="t-due">Due Date</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="t-due"
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="max-w-[200px]"
+              />
+              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+            </div>
           </div>
-          
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="billable"
+
+          <div className="flex items-center gap-2">
+            <input
+              id="t-billable"
+              type="checkbox"
               checked={isBillable}
-              onCheckedChange={(checked) => setIsBillable(checked === true)}
+              onChange={(e) => setIsBillable(e.target.checked)}
             />
-            <Label htmlFor="billable">Billable</Label>
+            <Label htmlFor="t-billable">Billable</Label>
           </div>
         </div>
-        
+
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button 
-            onClick={handleSave} 
-            disabled={saving || !title.trim()}
-            data-testid="task-edit-save"
-          >
+          <Button data-testid="task-edit-save" onClick={handleSave} disabled={saving}>
             {saving ? "Saving..." : "Save"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
-};
+}
 
-// Draggable Task Card Component  
-const DraggableTaskCard = ({ 
-  task, 
-  onMarkDone, 
-  onEdit, 
-  projects, 
-  clients 
-}: { 
-  task: any; 
-  onMarkDone: (id: string) => void; 
-  onEdit: (task: any) => void;
-  projects: any[]; 
-  clients: any[]; 
-}) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: task.id });
-
-  const style = {
+// -----------------------------------------------------------
+// Sortable Kanban Card
+// -----------------------------------------------------------
+function DraggableTaskCard({
+  task,
+  onEdit,
+  onMarkDone,
+}: {
+  task: TaskItem;
+  onEdit: (t: TaskItem) => void;
+  onMarkDone: (id: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
+    id: task.id,
+  });
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
   };
 
-  const project = projects.find((p: any) => p.id === task.project_id);
-  const client = clients.find((c: any) => c.id === project?.client_id);
-  
   return (
-    <Card 
+    <div
       ref={setNodeRef}
       style={style}
-      className="cursor-pointer hover:shadow-md transition-shadow"
+      className="rounded-lg border bg-card p-3 shadow-sm flex items-start justify-between gap-2"
       data-testid="task-card"
       data-id={task.id}
       {...attributes}
       {...listeners}
     >
-      <CardContent className="p-4">
-        <div className="space-y-2">
-          <div className="flex items-start justify-between">
-            <h4 className="font-medium">{task.title}</h4>
-            <div className="flex items-center gap-1">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit(task);
-                }}
-                data-testid="task-edit-open"
-              >
-                <Edit className="h-3 w-3" />
-              </Button>
-              <Badge variant={task.is_billable ? "default" : "secondary"}>
-                {task.is_billable ? "₹ Billable" : "Free"}
-              </Badge>
-            </div>
-          </div>
-          
-          {project && (
-            <p className="text-sm text-muted-foreground">{project.name}</p>
-          )}
-          
-          {client && (
-            <p className="text-xs text-muted-foreground">{client.name}</p>
-          )}
-          
-          {task.due_date && (
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">
-                Due: {new Date(task.due_date).toLocaleDateString()}
-              </span>
-              {task.status === "open" && (
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMarkDone(task.id);
-                  }}
-                >
-                  Mark Done
-                </Button>
-              )}
-            </div>
-          )}
+      <div className="space-y-1">
+        <div className="font-medium">{task.title}</div>
+        <div className="text-xs text-muted-foreground">
+          {task.due_date ? `Due: ${new Date(task.due_date).toLocaleDateString()}` : "No due date"}
         </div>
-      </CardContent>
-    </Card>
+        {task.is_billable ? (
+          <Badge variant="default" className="text-[10px]">₹ Billable</Badge>
+        ) : (
+          <Badge variant="secondary" className="text-[10px]">Free</Badge>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit(task);
+          }}
+          data-testid="task-edit-open"
+        >
+          <Edit3 className="h-4 w-4" />
+        </Button>
+        {task.status === "open" && (
+          <Button size="sm" variant="outline" onClick={() => onMarkDone(task.id)}>
+            <Check className="h-4 w-4 mr-1" />
+            Done
+          </Button>
+        )}
+      </div>
+    </div>
   );
-};
+}
 
-// Static Task Card for List View
-const TaskCard = ({ 
-  task, 
-  onMarkDone, 
-  onEdit, 
-  projects, 
-  clients 
-}: { 
-  task: any; 
-  onMarkDone: (id: string) => void; 
-  onEdit: (task: any) => void;
-  projects: any[]; 
-  clients: any[]; 
-}) => {
-  const project = projects.find((p: any) => p.id === task.project_id);
-  const client = clients.find((c: any) => c.id === project?.client_id);
-  
+// -----------------------------------------------------------
+// Droppable Column
+// -----------------------------------------------------------
+function KanbanColumn({
+  id,
+  title,
+  items,
+  children,
+}: {
+  id: "open" | "done";
+  title: string;
+  items: TaskItem[];
+  children: React.ReactNode;
+}) {
+  const { setNodeRef } = useDroppable({ id: `col-${id}` });
+
   return (
-    <Card className="cursor-pointer hover:shadow-md transition-shadow" data-testid="task-card" data-id={task.id}>
-      <CardContent className="p-4">
-        <div className="space-y-2">
-          <div className="flex items-start justify-between">
-            <h4 className="font-medium">{task.title}</h4>
-            <div className="flex items-center gap-1">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => onEdit(task)}
-                data-testid="task-edit-open"
-              >
-                <Edit className="h-3 w-3" />
-              </Button>
-              <Badge variant={task.is_billable ? "default" : "secondary"}>
-                {task.is_billable ? "₹ Billable" : "Free"}
-              </Badge>
-            </div>
-          </div>
-          
-          {project && (
-            <p className="text-sm text-muted-foreground">{project.name}</p>
-          )}
-          
-          {client && (
-            <p className="text-xs text-muted-foreground">{client.name}</p>
-          )}
-          
-          {task.due_date && (
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">
-                Due: {new Date(task.due_date).toLocaleDateString()}
-              </span>
-              {task.status === "open" && (
-                <Button size="sm" variant="outline" onClick={() => onMarkDone(task.id)}>
-                  Mark Done
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+    <div className="flex-1 space-y-3" ref={setNodeRef} data-testid={`kanban-col-${id}`}>
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold">{title}</div>
+        <Badge variant="outline">{items.length}</Badge>
+      </div>
+      <div className="space-y-2">{children}</div>
+    </div>
   );
-};
+}
 
+// -----------------------------------------------------------
+// Main Page
+// -----------------------------------------------------------
 export default function Tasks() {
-  const { data: tasks = [] } = useQuery({ queryKey: CACHE_KEYS.TASKS, queryFn: tasks_all });
-  const { data: projects = [] } = useQuery({ queryKey: CACHE_KEYS.PROJECTS, queryFn: projects_all });
-  const { data: clients = [] } = useQuery({ queryKey: CACHE_KEYS.CLIENTS, queryFn: clients_all });
-  
-  const [view, setView] = useState<"list" | "kanban">("list");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [projectFilter, setProjectFilter] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editingTask, setEditingTask] = useState<any>(null);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  
   const { toast } = useToast();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    })
-  );
+  const { data: tasks = [] } = useQuery({ queryKey: CACHE_KEYS.TASKS, queryFn: tasks_all });
+  const { data: projects = [] } = useQuery({ queryKey: CACHE_KEYS.PROJECTS, queryFn: projects_all as any });
+  const { data: clients = [] } = useQuery({ queryKey: CACHE_KEYS.CLIENTS, queryFn: clients_all });
 
-  const filteredTasks = tasks.filter((task: any) => {
-    if (statusFilter !== "all" && task.status !== statusFilter) return false;
-    if (projectFilter !== "all" && task.project_id !== projectFilter) return false;
-    if (searchQuery && !task.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    return true;
-  });
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
+
+  const [view, setView] = useState<"list" | "kanban">("kanban");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "open" | "done">("all");
+  const [projectFilter, setProjectFilter] = useState<string>("all");
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  // Filters
+  const filteredTasks: TaskItem[] = useMemo(() => {
+    const s = search.trim().toLowerCase();
+    return (tasks as TaskItem[]).filter((t) => {
+      if (statusFilter !== "all" && t.status !== statusFilter) return false;
+      if (projectFilter !== "all" && t.project_id !== projectFilter) return false;
+      if (s && !t.title.toLowerCase().includes(s)) return false;
+      return true;
+    });
+  }, [tasks, search, statusFilter, projectFilter]);
+
+  const columnItems = useMemo(() => {
+    const open = filteredTasks.filter((t) => t.status === "open");
+    const done = filteredTasks.filter((t) => t.status === "done");
+    return { open, done };
+  }, [filteredTasks]);
+
+  const getProjectName = (projectId?: string | null) =>
+    (projects as ProjectItem[]).find((p) => p.id === projectId)?.name ?? "-";
+
+  const getClientNameForProject = (projectId?: string | null) => {
+    const p = (projects as ProjectItem[]).find((x) => x.id === projectId);
+    return (clients as ClientItem[]).find((c) => c.id === p?.client_id)?.name ?? "-";
+  };
+
+  // Actions
+  const invalidateTasks = () => {
+    queryClient.invalidateQueries({ queryKey: CACHE_KEYS.TASKS });
+    queryClient.invalidateQueries({ queryKey: CACHE_KEYS.DASHBOARD });
+  };
 
   const handleMarkDone = async (taskId: string) => {
     try {
-      await update_task(taskId, { status: "done" });
-      
-      // Log task completion
+      await update_task(taskId, { status: "done" } as any);
       await create_message_log({
-        related_type: "task",
+        related_type: "task" as any,
         related_id: taskId,
-        channel: "whatsapp",
+        channel: "whatsapp" as any,
         template_used: "task_completed",
-        outcome: "ok"
+        outcome: "ok",
       });
-      
-      // Invalidate caches
-      queryClient.invalidateQueries({ queryKey: CACHE_KEYS.TASKS });
-      queryClient.invalidateQueries({ queryKey: CACHE_KEYS.DASHBOARD });
-      queryClient.invalidateQueries({ queryKey: CACHE_KEYS.MESSAGES });
-      
-      toast({ title: "✅ Task marked as done" });
-    } catch (error: any) {
-      console.error('Task update error:', error);
-      toast({ title: "❌ Error updating task", description: error.message || "Unknown error", variant: "destructive" });
+      invalidateTasks();
+      toast({ title: "Task marked as done" });
+    } catch (e: any) {
+      toast({ title: "Error updating task", description: e?.message ?? "Unknown error", variant: "destructive" });
     }
   };
 
+  // DnD handlers
   const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as string);
+    // no-op: reserve if we add a drag overlay later
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
-    setActiveId(null);
+    if (!active || !over) return;
 
-    if (!over) return;
+    const taskId = String(active.id);
 
-    const taskId = active.id as string;
-    const newStatus = over.id as string;
-    
-    // Map column IDs to task statuses
-    const statusMap: { [key: string]: string } = {
-      'open': 'open',
-      'in_progress': 'open', // We don't have in_progress status in our schema, map to open
-      'done': 'done'
-    };
+    // If dropped over a column droppable, over.id will be "col-open" or "col-done"
+    let newStatus: "open" | "done" | null = null;
+    const overId = String(over.id);
+    if (overId.startsWith("col-")) {
+      newStatus = overId.replace("col-", "") as "open" | "done";
+    } else {
+      // Dropped over another task card; figure out which column that card belongs to
+      const inOpen = columnItems.open.some((t) => t.id === overId);
+      const inDone = columnItems.done.some((t) => t.id === overId);
+      if (inOpen) newStatus = "open";
+      if (inDone) newStatus = "done";
+    }
 
-    const mappedStatus = statusMap[newStatus] || newStatus;
+    if (!newStatus) return;
 
     try {
-      await update_task(taskId, { status: mappedStatus as "open" | "done" });
-      queryClient.invalidateQueries({ queryKey: CACHE_KEYS.TASKS });
+      await update_task(taskId, { status: newStatus } as any);
+      invalidateTasks();
       toast({ title: "Task status updated" });
-    } catch (error: any) {
-      toast({ title: "Error updating task", description: error.message, variant: "destructive" });
+    } catch (e: any) {
+      toast({ title: "Error updating task", description: e?.message ?? "Unknown error", variant: "destructive" });
     }
-  };
-
-  const kanbanColumns = {
-    open: filteredTasks.filter((t: any) => t.status === "open"),
-    done: filteredTasks.filter((t: any) => t.status === "done")
-  };
-
-  const getProjectName = (projectId?: string) => {
-    return projects.find((p: any) => p.id === projectId)?.name || "-";
-  };
-
-  const getClientName = (projectId?: string) => {
-    const project = projects.find((p: any) => p.id === projectId);
-    return clients.find((c: any) => c.id === project?.client_id)?.name || "-";
-  };
-
-  const handleEditTask = (task: any) => {
-    setEditingTask(task);
-  };
-
-  const handleTaskSaved = () => {
-    queryClient.invalidateQueries({ queryKey: CACHE_KEYS.TASKS });
-    setEditingTask(null);
   };
 
   return (
     <div className="space-y-6">
-      <SEO title="HustleHub — Tasks" description="Manage tasks and projects with list and kanban views." />
-      
+      <SEO title="HustleHub — Tasks" description="Manage your tasks in list or kanban view." />
+
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Tasks & Projects</h1>
-        <Button onClick={() => setShowAddModal(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Task
-        </Button>
+        <h1 className="text-2xl font-semibold">Tasks</h1>
+        <Button onClick={() => setShowAddModal(true)}>Add Task</Button>
       </div>
 
-      {/* Filters and View Toggle */}
+      {/* Filters */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-center gap-4">
-            {/* Search */}
-            <div className="flex items-center gap-2 flex-1 min-w-64">
-              <Search className="h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search tasks..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1"
-              />
-            </div>
+        <CardContent className="py-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <Input
+              placeholder="Search tasks…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="md:max-w-xs"
+            />
 
-            {/* Filters */}
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="open">Open</SelectItem>
-                  <SelectItem value="done">Done</SelectItem>
-                </SelectContent>
-              </Select>
+            <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="done">Done</SelectItem>
+              </SelectContent>
+            </Select>
 
-              <Select value={projectFilter} onValueChange={setProjectFilter}>
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Projects</SelectItem>
-                  {projects.map((project: any) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={projectFilter} onValueChange={(v) => setProjectFilter(v)}>
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Project" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Projects</SelectItem>
+                {(projects as ProjectItem[]).map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-            {/* View Toggle */}
-            <div className="flex items-center border rounded-md">
+            <div className="ml-auto flex items-center gap-2">
               <Button
-                variant={view === "list" ? "default" : "ghost"}
+                variant={view === "list" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setView("list")}
+                title="List"
               >
-                <List className="h-4 w-4" />
+                <List className="h-4 w-4 mr-1" /> List
               </Button>
               <Button
-                variant={view === "kanban" ? "default" : "ghost"}
+                variant={view === "kanban" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setView("kanban")}
+                title="Kanban"
               >
-                <LayoutGrid className="h-4 w-4" />
+                <Layout className="h-4 w-4 mr-1" /> Kanban
               </Button>
             </div>
           </div>
@@ -510,51 +441,38 @@ export default function Tasks() {
                   <TableHead>Title</TableHead>
                   <TableHead>Project</TableHead>
                   <TableHead>Client</TableHead>
-                  <TableHead>Due Date</TableHead>
+                  <TableHead>Due</TableHead>
                   <TableHead>Billable</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTasks.map((task: any) => (
-                  <TableRow key={task.id} data-testid="task-card" data-id={task.id}>
-                    <TableCell className="font-medium">{task.title}</TableCell>
-                    <TableCell>{getProjectName(task.project_id)}</TableCell>
-                    <TableCell>{getClientName(task.project_id)}</TableCell>
+                {filteredTasks.map((t) => (
+                  <TableRow key={t.id} data-testid="task-card" data-id={t.id}>
+                    <TableCell className="font-medium">{t.title}</TableCell>
+                    <TableCell>{getProjectName(t.project_id)}</TableCell>
+                    <TableCell>{getClientNameForProject(t.project_id)}</TableCell>
+                    <TableCell>{t.due_date ? new Date(t.due_date).toLocaleDateString() : "-"}</TableCell>
+                    <TableCell>{t.is_billable ? "₹ Yes" : "No"}</TableCell>
                     <TableCell>
-                      {task.due_date ? new Date(task.due_date).toLocaleDateString() : "-"}
+                      <Badge variant={t.status === "done" ? "secondary" : "default"}>{t.status}</Badge>
                     </TableCell>
-                    <TableCell>
-                      <Badge variant={task.is_billable ? "default" : "secondary"}>
-                        {task.is_billable ? "₹ Yes" : "No"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={task.status === "done" ? "secondary" : "default"}>
-                        {task.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleEditTask(task)}
-                          data-testid="task-edit-open"
-                        >
-                          <Edit className="h-3 w-3" />
+                    <TableCell className="flex items-center gap-2">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => setEditingTask(t)}
+                        data-testid="task-edit-open"
+                      >
+                        <Edit3 className="h-4 w-4" />
+                      </Button>
+                      {t.status === "open" && (
+                        <Button size="sm" variant="outline" onClick={() => handleMarkDone(t.id)}>
+                          <Check className="h-4 w-4 mr-1" />
+                          Done
                         </Button>
-                        {task.status === "open" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleMarkDone(task.id)}
-                          >
-                            Mark Done
-                          </Button>
-                        )}
-                      </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -566,93 +484,74 @@ export default function Tasks() {
 
       {/* Kanban View */}
       {view === "kanban" && (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Open Column */}
-            <SortableContext 
-              items={kanbanColumns.open.map((task: any) => task.id)}
-              strategy={verticalListSortingStrategy}
+        <Card>
+          <CardHeader>
+            <CardTitle>Kanban</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
             >
-              <div className="space-y-3" data-testid="kanban-col-open">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold">Open</h3>
-                  <Badge variant="secondary">{kanbanColumns.open.length}</Badge>
-                </div>
-                <div className="space-y-3 min-h-[200px] p-4 border-2 border-dashed border-muted rounded-lg droppable" id="open">
-                  {kanbanColumns.open.map((task: any) => (
-                    <DraggableTaskCard 
-                      key={task.id} 
-                      task={task} 
-                      onMarkDone={handleMarkDone} 
-                      onEdit={handleEditTask}
-                      projects={projects} 
-                      clients={clients} 
-                    />
-                  ))}
-                </div>
-              </div>
-            </SortableContext>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <KanbanColumn id="open" title="Open" items={columnItems.open}>
+                  <SortableContext
+                    // items are the ids of cards in this column
+                    items={columnItems.open.map((t) => t.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {columnItems.open.map((t) => (
+                      <DraggableTaskCard
+                        key={t.id}
+                        task={t}
+                        onEdit={(task) => setEditingTask(task)}
+                        onMarkDone={handleMarkDone}
+                      />
+                    ))}
+                  </SortableContext>
+                </KanbanColumn>
 
-            {/* Done Column */}
-            <SortableContext 
-              items={kanbanColumns.done.map((task: any) => task.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <div className="space-y-3" data-testid="kanban-col-done">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold">Done</h3>
-                  <Badge variant="secondary">{kanbanColumns.done.length}</Badge>
-                </div>
-                <div className="space-y-3 min-h-[200px] p-4 border-2 border-dashed border-muted rounded-lg droppable" id="done">
-                  {kanbanColumns.done.map((task: any) => (
-                    <DraggableTaskCard 
-                      key={task.id} 
-                      task={task} 
-                      onMarkDone={handleMarkDone} 
-                      onEdit={handleEditTask}
-                      projects={projects} 
-                      clients={clients} 
-                    />
-                  ))}
-                </div>
+                <KanbanColumn id="done" title="Done" items={columnItems.done}>
+                  <SortableContext
+                    items={columnItems.done.map((t) => t.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {columnItems.done.map((t) => (
+                      <DraggableTaskCard
+                        key={t.id}
+                        task={t}
+                        onEdit={(task) => setEditingTask(task)}
+                        onMarkDone={handleMarkDone}
+                      />
+                    ))}
+                  </SortableContext>
+                </KanbanColumn>
               </div>
-            </SortableContext>
-          </div>
-
-          <DragOverlay>
-            {activeId ? (
-              <TaskCard 
-                task={filteredTasks.find((t: any) => t.id === activeId)} 
-                onMarkDone={handleMarkDone} 
-                onEdit={handleEditTask}
-                projects={projects} 
-                clients={clients} 
-              />
-            ) : null}
-          </DragOverlay>
-        </DndContext>
+            </DndContext>
+          </CardContent>
+        </Card>
       )}
 
-      <AddTaskModal 
-        isOpen={showAddModal} 
-        onClose={() => setShowAddModal(false)} 
+      {/* Modals */}
+      <AddTaskModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
         onSuccess={() => {
+          // refresh lists and dashboard metrics
           queryClient.invalidateQueries({ queryKey: CACHE_KEYS.TASKS });
           queryClient.invalidateQueries({ queryKey: CACHE_KEYS.DASHBOARD });
-          queryClient.invalidateQueries({ queryKey: CACHE_KEYS.MESSAGES });
-        }} 
+        }}
       />
 
       <TaskEditModal
         isOpen={!!editingTask}
         onClose={() => setEditingTask(null)}
         task={editingTask}
-        onSaved={handleTaskSaved}
+        onSaved={() => {
+          queryClient.invalidateQueries({ queryKey: CACHE_KEYS.TASKS });
+        }}
       />
     </div>
   );
