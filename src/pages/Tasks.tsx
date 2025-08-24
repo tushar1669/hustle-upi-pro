@@ -5,27 +5,282 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useState } from "react";
-import { Plus, List, LayoutGrid, Filter, Search } from "lucide-react";
+import { Plus, List, LayoutGrid, Filter, Search, Edit, CalendarIcon } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { tasks_all, projects_all, clients_all, update_task, create_message_log } from "@/data/collections";
 import { useToast } from "@/hooks/use-toast";
+import { CACHE_KEYS } from "@/hooks/useCache";
 import AddTaskModal from "@/components/AddTaskModal";
 import { useNavigate } from "react-router-dom";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { 
+  DndContext, 
+  DragEndEvent, 
+  DragOverlay, 
+  DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter
+} from "@dnd-kit/core";
+import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
-const TaskCard = ({ task, onMarkDone, projects, clients }: { task: any; onMarkDone: (id: string) => void; projects: any[]; clients: any[] }) => {
+// Task Edit Modal Component
+const TaskEditModal = ({ 
+  isOpen, 
+  onClose, 
+  task, 
+  onSaved 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  task: any; 
+  onSaved: () => void; 
+}) => {
+  const [title, setTitle] = useState(task?.title || "");
+  const [dueDate, setDueDate] = useState<Date | undefined>(task?.due_date ? new Date(task.due_date) : undefined);
+  const [isBillable, setIsBillable] = useState(task?.is_billable || false);
+  const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
+
+  const handleSave = async () => {
+    if (!task) return;
+    
+    setSaving(true);
+    try {
+      await update_task(task.id, {
+        title,
+        due_date: dueDate ? dueDate.toISOString().split('T')[0] : null,
+        is_billable: isBillable
+      });
+      
+      toast({ title: "Task updated" });
+      onSaved();
+      onClose();
+    } catch (error: any) {
+      toast({ 
+        title: "Error updating task", 
+        description: error.message, 
+        variant: "destructive" 
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit Task</DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="title">Title</Label>
+            <Input
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Task title"
+            />
+          </div>
+          
+          <div>
+            <Label>Due Date</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !dueDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dueDate ? format(dueDate, "PPP") : "Pick a date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dueDate}
+                  onSelect={setDueDate}
+                  initialFocus
+                  className="p-3 pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="billable"
+              checked={isBillable}
+              onCheckedChange={(checked) => setIsBillable(checked === true)}
+            />
+            <Label htmlFor="billable">Billable</Label>
+          </div>
+        </div>
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSave} 
+            disabled={saving || !title.trim()}
+            data-testid="task-edit-save"
+          >
+            {saving ? "Saving..." : "Save"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// Draggable Task Card Component  
+const DraggableTaskCard = ({ 
+  task, 
+  onMarkDone, 
+  onEdit, 
+  projects, 
+  clients 
+}: { 
+  task: any; 
+  onMarkDone: (id: string) => void; 
+  onEdit: (task: any) => void;
+  projects: any[]; 
+  clients: any[]; 
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
   const project = projects.find((p: any) => p.id === task.project_id);
   const client = clients.find((c: any) => c.id === project?.client_id);
   
   return (
-    <Card className="cursor-pointer hover:shadow-md transition-shadow">
+    <Card 
+      ref={setNodeRef}
+      style={style}
+      className="cursor-pointer hover:shadow-md transition-shadow"
+      data-testid="task-card"
+      data-id={task.id}
+      {...attributes}
+      {...listeners}
+    >
       <CardContent className="p-4">
         <div className="space-y-2">
           <div className="flex items-start justify-between">
             <h4 className="font-medium">{task.title}</h4>
-            <Badge variant={task.is_billable ? "default" : "secondary"}>
-              {task.is_billable ? "₹ Billable" : "Free"}
-            </Badge>
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(task);
+                }}
+                data-testid="task-edit-open"
+              >
+                <Edit className="h-3 w-3" />
+              </Button>
+              <Badge variant={task.is_billable ? "default" : "secondary"}>
+                {task.is_billable ? "₹ Billable" : "Free"}
+              </Badge>
+            </div>
+          </div>
+          
+          {project && (
+            <p className="text-sm text-muted-foreground">{project.name}</p>
+          )}
+          
+          {client && (
+            <p className="text-xs text-muted-foreground">{client.name}</p>
+          )}
+          
+          {task.due_date && (
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">
+                Due: {new Date(task.due_date).toLocaleDateString()}
+              </span>
+              {task.status === "open" && (
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMarkDone(task.id);
+                  }}
+                >
+                  Mark Done
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// Static Task Card for List View
+const TaskCard = ({ 
+  task, 
+  onMarkDone, 
+  onEdit, 
+  projects, 
+  clients 
+}: { 
+  task: any; 
+  onMarkDone: (id: string) => void; 
+  onEdit: (task: any) => void;
+  projects: any[]; 
+  clients: any[]; 
+}) => {
+  const project = projects.find((p: any) => p.id === task.project_id);
+  const client = clients.find((c: any) => c.id === project?.client_id);
+  
+  return (
+    <Card className="cursor-pointer hover:shadow-md transition-shadow" data-testid="task-card" data-id={task.id}>
+      <CardContent className="p-4">
+        <div className="space-y-2">
+          <div className="flex items-start justify-between">
+            <h4 className="font-medium">{task.title}</h4>
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => onEdit(task)}
+                data-testid="task-edit-open"
+              >
+                <Edit className="h-3 w-3" />
+              </Button>
+              <Badge variant={task.is_billable ? "default" : "secondary"}>
+                {task.is_billable ? "₹ Billable" : "Free"}
+              </Badge>
+            </div>
           </div>
           
           {project && (
@@ -55,18 +310,29 @@ const TaskCard = ({ task, onMarkDone, projects, clients }: { task: any; onMarkDo
 };
 
 export default function Tasks() {
-  const { data: tasks = [] } = useQuery({ queryKey: ["tasks_all"], queryFn: tasks_all });
-  const { data: projects = [] } = useQuery({ queryKey: ["projects_all"], queryFn: projects_all });
-  const { data: clients = [] } = useQuery({ queryKey: ["clients_all"], queryFn: clients_all });
+  const { data: tasks = [] } = useQuery({ queryKey: CACHE_KEYS.TASKS, queryFn: tasks_all });
+  const { data: projects = [] } = useQuery({ queryKey: CACHE_KEYS.PROJECTS, queryFn: projects_all });
+  const { data: clients = [] } = useQuery({ queryKey: CACHE_KEYS.CLIENTS, queryFn: clients_all });
   
   const [view, setView] = useState<"list" | "kanban">("list");
   const [statusFilter, setStatusFilter] = useState("all");
   const [projectFilter, setProjectFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingTask, setEditingTask] = useState<any>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  
   const { toast } = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
 
   const filteredTasks = tasks.filter((task: any) => {
     if (statusFilter !== "all" && task.status !== statusFilter) return false;
@@ -76,8 +342,6 @@ export default function Tasks() {
   });
 
   const handleMarkDone = async (taskId: string) => {
-    toast({ title: "Marking task as done..." });
-    
     try {
       await update_task(taskId, { status: "done" });
       
@@ -90,10 +354,10 @@ export default function Tasks() {
         outcome: "ok"
       });
       
-      // Invalidate all relevant caches
-      queryClient.invalidateQueries({ queryKey: ["tasks_all"] });
-      queryClient.invalidateQueries({ queryKey: ["v_dashboard_metrics"] });
-      queryClient.invalidateQueries({ queryKey: ["message_log_recent"] });
+      // Invalidate caches
+      queryClient.invalidateQueries({ queryKey: CACHE_KEYS.TASKS });
+      queryClient.invalidateQueries({ queryKey: CACHE_KEYS.DASHBOARD });
+      queryClient.invalidateQueries({ queryKey: CACHE_KEYS.MESSAGES });
       
       toast({ title: "✅ Task marked as done" });
     } catch (error: any) {
@@ -102,21 +366,39 @@ export default function Tasks() {
     }
   };
 
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (!over) return;
+
+    const taskId = active.id as string;
+    const newStatus = over.id as string;
+    
+    // Map column IDs to task statuses
+    const statusMap: { [key: string]: string } = {
+      'open': 'open',
+      'in_progress': 'open', // We don't have in_progress status in our schema, map to open
+      'done': 'done'
+    };
+
+    const mappedStatus = statusMap[newStatus] || newStatus;
+
+    try {
+      await update_task(taskId, { status: mappedStatus as "open" | "done" });
+      queryClient.invalidateQueries({ queryKey: CACHE_KEYS.TASKS });
+      toast({ title: "Task status updated" });
+    } catch (error: any) {
+      toast({ title: "Error updating task", description: error.message, variant: "destructive" });
+    }
+  };
+
   const kanbanColumns = {
-    today: filteredTasks.filter((t: any) => t.due_date && new Date(t.due_date).toDateString() === new Date().toDateString()),
-    thisWeek: filteredTasks.filter((t: any) => {
-      if (!t.due_date) return false;
-      const taskDate = new Date(t.due_date);
-      const today = new Date();
-      const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-      return taskDate > today && taskDate <= weekFromNow;
-    }),
-    later: filteredTasks.filter((t: any) => {
-      if (!t.due_date) return true;
-      const taskDate = new Date(t.due_date);
-      const weekFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-      return taskDate > weekFromNow && t.status === "open";
-    }),
+    open: filteredTasks.filter((t: any) => t.status === "open"),
     done: filteredTasks.filter((t: any) => t.status === "done")
   };
 
@@ -127,6 +409,15 @@ export default function Tasks() {
   const getClientName = (projectId?: string) => {
     const project = projects.find((p: any) => p.id === projectId);
     return clients.find((c: any) => c.id === project?.client_id)?.name || "-";
+  };
+
+  const handleEditTask = (task: any) => {
+    setEditingTask(task);
+  };
+
+  const handleTaskSaved = () => {
+    queryClient.invalidateQueries({ queryKey: CACHE_KEYS.TASKS });
+    setEditingTask(null);
   };
 
   return (
@@ -227,7 +518,7 @@ export default function Tasks() {
               </TableHeader>
               <TableBody>
                 {filteredTasks.map((task: any) => (
-                  <TableRow key={task.id}>
+                  <TableRow key={task.id} data-testid="task-card" data-id={task.id}>
                     <TableCell className="font-medium">{task.title}</TableCell>
                     <TableCell>{getProjectName(task.project_id)}</TableCell>
                     <TableCell>{getClientName(task.project_id)}</TableCell>
@@ -245,15 +536,25 @@ export default function Tasks() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {task.status === "open" && (
+                      <div className="flex items-center gap-2">
                         <Button
                           size="sm"
-                          variant="outline"
-                          onClick={() => handleMarkDone(task.id)}
+                          variant="ghost"
+                          onClick={() => handleEditTask(task)}
+                          data-testid="task-edit-open"
                         >
-                          Mark Done
+                          <Edit className="h-3 w-3" />
                         </Button>
-                      )}
+                        {task.status === "open" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleMarkDone(task.id)}
+                          >
+                            Mark Done
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -265,70 +566,93 @@ export default function Tasks() {
 
       {/* Kanban View */}
       {view === "kanban" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Today Column */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Today</h3>
-              <Badge variant="secondary">{kanbanColumns.today.length}</Badge>
-            </div>
-            <div className="space-y-3">
-              {kanbanColumns.today.map((task: any) => (
-                <TaskCard key={task.id} task={task} onMarkDone={handleMarkDone} projects={projects} clients={clients} />
-              ))}
-            </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Open Column */}
+            <SortableContext 
+              items={kanbanColumns.open.map((task: any) => task.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-3" data-testid="kanban-col-open">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">Open</h3>
+                  <Badge variant="secondary">{kanbanColumns.open.length}</Badge>
+                </div>
+                <div className="space-y-3 min-h-[200px] p-4 border-2 border-dashed border-muted rounded-lg droppable" id="open">
+                  {kanbanColumns.open.map((task: any) => (
+                    <DraggableTaskCard 
+                      key={task.id} 
+                      task={task} 
+                      onMarkDone={handleMarkDone} 
+                      onEdit={handleEditTask}
+                      projects={projects} 
+                      clients={clients} 
+                    />
+                  ))}
+                </div>
+              </div>
+            </SortableContext>
+
+            {/* Done Column */}
+            <SortableContext 
+              items={kanbanColumns.done.map((task: any) => task.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-3" data-testid="kanban-col-done">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">Done</h3>
+                  <Badge variant="secondary">{kanbanColumns.done.length}</Badge>
+                </div>
+                <div className="space-y-3 min-h-[200px] p-4 border-2 border-dashed border-muted rounded-lg droppable" id="done">
+                  {kanbanColumns.done.map((task: any) => (
+                    <DraggableTaskCard 
+                      key={task.id} 
+                      task={task} 
+                      onMarkDone={handleMarkDone} 
+                      onEdit={handleEditTask}
+                      projects={projects} 
+                      clients={clients} 
+                    />
+                  ))}
+                </div>
+              </div>
+            </SortableContext>
           </div>
 
-          {/* This Week Column */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">This Week</h3>
-              <Badge variant="secondary">{kanbanColumns.thisWeek.length}</Badge>
-            </div>
-            <div className="space-y-3">
-              {kanbanColumns.thisWeek.map((task: any) => (
-                <TaskCard key={task.id} task={task} onMarkDone={handleMarkDone} projects={projects} clients={clients} />
-              ))}
-            </div>
-          </div>
-
-          {/* Later Column */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Later</h3>
-              <Badge variant="secondary">{kanbanColumns.later.length}</Badge>
-            </div>
-            <div className="space-y-3">
-              {kanbanColumns.later.map((task: any) => (
-                <TaskCard key={task.id} task={task} onMarkDone={handleMarkDone} projects={projects} clients={clients} />
-              ))}
-            </div>
-          </div>
-
-          {/* Done Column */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Done</h3>
-              <Badge variant="secondary">{kanbanColumns.done.length}</Badge>
-            </div>
-            <div className="space-y-3">
-              {kanbanColumns.done.map((task: any) => (
-                <TaskCard key={task.id} task={task} onMarkDone={handleMarkDone} projects={projects} clients={clients} />
-              ))}
-            </div>
-          </div>
-        </div>
+          <DragOverlay>
+            {activeId ? (
+              <TaskCard 
+                task={filteredTasks.find((t: any) => t.id === activeId)} 
+                onMarkDone={handleMarkDone} 
+                onEdit={handleEditTask}
+                projects={projects} 
+                clients={clients} 
+              />
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       )}
 
       <AddTaskModal 
         isOpen={showAddModal} 
         onClose={() => setShowAddModal(false)} 
         onSuccess={() => {
-          // Invalidate all relevant caches
-          queryClient.invalidateQueries({ queryKey: ["tasks_all"] });
-          queryClient.invalidateQueries({ queryKey: ["v_dashboard_metrics"] });
-          queryClient.invalidateQueries({ queryKey: ["message_log_recent"] });
+          queryClient.invalidateQueries({ queryKey: CACHE_KEYS.TASKS });
+          queryClient.invalidateQueries({ queryKey: CACHE_KEYS.DASHBOARD });
+          queryClient.invalidateQueries({ queryKey: CACHE_KEYS.MESSAGES });
         }} 
+      />
+
+      <TaskEditModal
+        isOpen={!!editingTask}
+        onClose={() => setEditingTask(null)}
+        task={editingTask}
+        onSaved={handleTaskSaved}
       />
     </div>
   );
