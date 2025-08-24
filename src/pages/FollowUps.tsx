@@ -23,6 +23,7 @@ import {
   bulk_update_reminders,
   create_message_log
 } from "@/data/collections";
+import { sendReminderViaWhatsApp } from "@/lib/reminderActions";
 import { useToast } from "@/hooks/use-toast";
 import { useCelebrationContext } from "@/components/CelebrationProvider";
 import { FollowUpPreviewDrawer } from "@/components/FollowUpPreviewDrawer";
@@ -189,15 +190,24 @@ export default function FollowUps() {
     }
   };
 
+  const [sending, setSending] = useState(false);
+
   const handleConfirmSend = async () => {
     const { reminder } = previewDrawer;
     if (!reminder) return;
 
+    setSending(true);
     try {
-      await handleSendNow(reminder, true);
+      await sendReminderViaWhatsApp(reminder);
+      toast({ title: "Reminder sent" });
       setPreviewDrawer({ isOpen: false });
-    } catch (error) {
-      toast({ title: "Error sending reminder", variant: "destructive" });
+      // Invalidate data used by the page/QA
+      queryClient.invalidateQueries({ queryKey: ["all_reminders"] });
+      queryClient.invalidateQueries({ queryKey: ["message_log_recent"] });
+    } catch (e: any) {
+      toast({ title: "Error sending reminder", description: e?.message ?? "Unknown error", variant: "destructive" });
+    } finally {
+      setSending(false);
     }
   };
 
@@ -623,7 +633,11 @@ export default function FollowUps() {
                       <div className="flex items-center justify-end gap-2">
                         {reminder.status === 'pending' && (
                           <>
-                            <Button size="sm" onClick={() => handleSendNow(reminder)}>
+                            <Button 
+                              size="sm" 
+                              onClick={() => handleSendNow(reminder)}
+                              data-testid="btn-open-reminder-preview"
+                            >
                               <Send className="h-4 w-4 mr-1" />
                               Send
                             </Button>
@@ -666,6 +680,7 @@ export default function FollowUps() {
         client={previewDrawer.client}
         settings={settings}
         onConfirm={handleConfirmSend}
+        data-testid="btn-confirm-send"
       />
 
       {/* Reschedule Dialog */}

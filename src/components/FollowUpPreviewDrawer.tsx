@@ -212,7 +212,11 @@ export function FollowUpPreviewDrawer({
             <Button onClick={onClose} variant="outline" className="flex-1">
               Cancel
             </Button>
-            <Button onClick={onConfirm} className="flex-1">
+            <Button 
+              onClick={onConfirm} 
+              className="flex-1"
+              data-testid="btn-confirm-send"
+            >
               Confirm & Send
             </Button>
           </div>
