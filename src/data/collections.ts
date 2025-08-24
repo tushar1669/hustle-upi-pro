@@ -52,6 +52,12 @@ export async function create_client(payload: { name: string; whatsapp: string; e
   return data;
 }
 
+export async function update_client(id: string, changes: Partial<{ name: string; whatsapp: string; email: string; address?: string; gstin?: string; upi_vpa?: string; }>) {
+  const { data, error } = await supabase.from("clients").update(changes).eq("id", id).select("*").single();
+  if (error) throw error;
+  return data;
+}
+
 // ============ Projects ============
 export async function projects_all() {
   const { data, error } = await supabase.from("projects").select("*");

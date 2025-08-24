@@ -7,14 +7,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { Plus, Edit } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { clients_all, create_client } from "@/data/collections";
 import { useToast } from "@/hooks/use-toast";
+import ClientEditModal from "@/components/ClientEditModal";
 
 export default function Clients() {
   const { data: clients = [], refetch } = useQuery({ queryKey: ["clients_all"], queryFn: clients_all });
   const [isOpen, setIsOpen] = useState(false);
+  const [editClient, setEditClient] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     whatsapp: "",
@@ -45,6 +48,18 @@ export default function Clients() {
     } catch (error) {
       toast({ title: "Error creating client", variant: "destructive" });
     }
+  };
+
+  const handleEditClient = (client: any) => {
+    setEditClient(client);
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditSave = async () => {
+    await refetch();
+    queryClient.invalidateQueries({ queryKey: ["clients_all"] });
+    setIsEditModalOpen(false);
+    setEditClient(null);
   };
 
   return (
@@ -129,6 +144,7 @@ export default function Clients() {
                 <TableHead>Email</TableHead>
                 <TableHead>GSTIN</TableHead>
                 <TableHead>UPI VPA</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -139,12 +155,30 @@ export default function Clients() {
                   <TableCell>{c.email || "—"}</TableCell>
                   <TableCell>{c.gstin || "—"}</TableCell>
                   <TableCell>{c.upi_vpa || "—"}</TableCell>
+                  <TableCell>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleEditClient(c)}
+                      data-testid="btn-client-edit"
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Edit
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+
+      <ClientEditModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        client={editClient}
+        onSave={handleEditSave}
+      />
     </div>
   );
 }
