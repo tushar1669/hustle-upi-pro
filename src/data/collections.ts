@@ -339,6 +339,69 @@ export async function message_log_insert(payload: { related_type: "invoice" | "t
   return create_message_log(payload);
 }
 
+// ============ Savings Goals ============
+export async function savings_goals_all() {
+  // Use any type to bypass TypeScript validation for now
+  const { data, error } = await (supabase as any)
+    .from("savings_goals")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function savings_goal_detail(id: string) {
+  const { data, error } = await (supabase as any)
+    .from("savings_goals")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function create_savings_goal(payload: {
+  title: string;
+  target_amount: number;
+  saved_amount?: number;
+  target_date?: string;
+  type?: string;
+}) {
+  const { data, error } = await (supabase as any)
+    .from("savings_goals")
+    .insert([payload])
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function update_savings_goal(id: string, changes: {
+  title?: string;
+  target_amount?: number;
+  saved_amount?: number;
+  target_date?: string;
+  type?: string;
+}) {
+  const { data, error } = await (supabase as any)
+    .from("savings_goals")
+    .update(changes)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function delete_savings_goal(id: string) {
+  const { error } = await (supabase as any)
+    .from("savings_goals")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
+  return true;
+}
+
 // ============ Dashboard View ============
 export async function v_dashboard_metrics() {
   const { data, error } = await supabase.from("v_dashboard_metrics").select("*").limit(1).maybeSingle();

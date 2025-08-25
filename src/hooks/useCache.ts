@@ -8,6 +8,7 @@ export const CACHE_KEYS = {
   REMINDERS: ['reminders'],
   DASHBOARD: ['v_dashboard_metrics'],
   MESSAGES: ['message_log_recent'],
+  SAVINGS_GOALS: ['savings_goals_all'],
   INVOICE_ITEMS: (invoiceId: string) => ['invoice_items', invoiceId]
 } as const;
 
