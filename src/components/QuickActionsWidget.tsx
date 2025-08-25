@@ -117,15 +117,15 @@ export default function QuickActionsWidget() {
       <CardContent className="space-y-6">
         {/* Action Buttons */}
         <div className="grid grid-cols-2 gap-2">
-          <Button onClick={() => navigate("/invoices/new")} className="h-12">
+          <Button onClick={() => navigate("/invoices/new")} className="h-12" data-testid="qa-btn-new-invoice">
             <FileText className="h-4 w-4 mr-2" />
             New Invoice
           </Button>
-          <Button variant="secondary" onClick={handleAddTask} className="h-12">
+          <Button variant="secondary" onClick={handleAddTask} className="h-12" data-testid="qa-btn-add-task">
             <CheckSquare className="h-4 w-4 mr-2" />
             Add Task
           </Button>
-          <Button variant="outline" onClick={handleAddClient} className="h-12">
+          <Button variant="outline" onClick={handleAddClient} className="h-12" data-testid="qa-btn-add-client">
             <Users className="h-4 w-4 mr-2" />
             Add Client
           </Button>

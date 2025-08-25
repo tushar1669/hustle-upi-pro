@@ -181,6 +181,7 @@ const Index = () => {
                 onClick={() => navigate("/invoices/new")}
                 className="h-20 text-left flex-col items-start justify-center"
                 variant="outline"
+                data-testid="qa-btn-new-invoice"
               >
                 <FileText className="w-6 h-6 mb-2 text-primary" />
                 <div>
@@ -192,6 +193,7 @@ const Index = () => {
                 onClick={() => navigate("/tasks")}
                 className="h-20 text-left flex-col items-start justify-center"
                 variant="outline"
+                data-testid="qa-btn-add-task"
               >
                 <Target className="w-6 h-6 mb-2 text-accent" />
                 <div>
@@ -203,6 +205,7 @@ const Index = () => {
                 onClick={() => navigate("/clients")}
                 className="h-20 text-left flex-col items-start justify-center"
                 variant="outline"
+                data-testid="qa-btn-add-client"
               >
                 <Users className="w-6 h-6 mb-2 text-success" />
                 <div>

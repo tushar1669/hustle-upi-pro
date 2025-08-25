@@ -5,7 +5,17 @@ import {
   create_reminder, settings_one
 } from "@/data/collections";
 
-export async function seedDemoData() {
+export interface SeedSummary {
+  clients: number;
+  projects: number;
+  invoices: number;
+  items: number;
+  tasks: number;
+  reminders: number;
+  logs: number;
+}
+
+export async function seedDemoData(): Promise<SeedSummary> {
   const settings = await settings_one().catch(() => null);
   if (!settings) {
     await supabase.from("settings").insert({
@@ -107,5 +117,128 @@ export async function seedDemoData() {
     outcome: "seeded"
   });
 
-  return { ok: true };
+  // Generate additional deterministic demo data for consistent testing
+  const demoClients = [
+    { name: "Acme Studios", email: "hello@acme.com", whatsapp: "+91-9876543210", gstin: "29ABCDE1234F1Z1" },
+    { name: "Bright Ideas", email: "contact@brightideas.co", whatsapp: "+91-9876543211", gstin: "29ABCDE1234F1Z2" }
+  ];
+
+  for (const clientData of demoClients) {
+    const existingClient = await supabase
+      .from('clients')
+      .select('id')
+      .eq('name', clientData.name)
+      .single();
+    
+    if (!existingClient.data) {
+      await supabase.from('clients').insert(clientData);
+    }
+  }
+
+  // Create additional demo invoices with specific patterns for testing
+  const allClientsAfterSeed = await clients_all();
+  if (allClientsAfterSeed.length >= 2) {
+    const clientB = allClientsAfterSeed[1];
+    
+    // Create a "sent" invoice that's overdue for testing follow-ups
+    const overdueDate = new Date();
+    overdueDate.setDate(overdueDate.getDate() - 5); // 5 days overdue
+    
+    const { data: overdueInvoice } = await supabase
+      .from('invoices')
+      .select('id')
+      .eq('invoice_number', 'QA-2025-OVERDUE')
+      .single();
+    
+    if (!overdueInvoice) {
+      const overdue = await create_invoice({
+        invoice_number: "QA-2025-OVERDUE",
+        client_id: clientB.id,
+        issue_date: new Date(Date.now() - 10 * 864e5).toISOString().split('T')[0], // 10 days ago
+        due_date: overdueDate.toISOString().split('T')[0],
+        subtotal: 50000,
+        gst_amount: 9000,
+        total_amount: 59000,
+        status: "sent"
+      });
+      
+      await create_item({ 
+        invoice_id: overdue.id, 
+        title: "UI Design Sprint", 
+        qty: 2, 
+        rate: 25000, 
+        amount: 50000 
+      });
+      
+      // Create reminders for the overdue invoice
+      await create_reminder({
+        invoice_id: overdue.id,
+        scheduled_at: new Date(Date.now() + 3 * 864e5).toISOString(), // 3 days from now
+        channel: "whatsapp",
+        status: "pending"
+      });
+      
+      await create_reminder({
+        invoice_id: overdue.id,
+        scheduled_at: new Date(Date.now() + 7 * 864e5).toISOString(), // 7 days from now
+        channel: "whatsapp", 
+        status: "pending"
+      });
+    }
+  }
+
+  // Create additional demo tasks with mixed statuses
+  const demoTasks = [
+    {
+      title: "Send assets to Acme",
+      due_date: new Date(Date.now() + 1 * 864e5).toISOString().split('T')[0], // tomorrow
+      status: "open" as const,
+      is_billable: false
+    },
+    {
+      title: "Bright Ideas review call", 
+      due_date: new Date(Date.now() + 3 * 864e5).toISOString().split('T')[0], // 3 days
+      status: "open" as const,
+      is_billable: true
+    },
+    {
+      title: "Portfolio refresh",
+      due_date: new Date(Date.now() - 1 * 864e5).toISOString().split('T')[0], // yesterday
+      status: "done" as const,
+      is_billable: false
+    }
+  ];
+
+  for (const taskData of demoTasks) {
+    const existingTask = await supabase
+      .from('tasks')
+      .select('id')
+      .eq('title', taskData.title)
+      .single();
+    
+    if (!existingTask.data) {
+      await create_task(taskData);
+    }
+  }
+
+  // Count final results
+  const finalCounts = await Promise.all([
+    supabase.from('clients').select('id', { count: 'exact' }),
+    supabase.from('projects').select('id', { count: 'exact' }),
+    supabase.from('invoices').select('id', { count: 'exact' }),
+    supabase.from('invoice_items').select('id', { count: 'exact' }),
+    supabase.from('tasks').select('id', { count: 'exact' }),
+    supabase.from('reminders').select('id', { count: 'exact' }),
+    supabase.from('message_log').select('id', { count: 'exact' }).eq('template_used', 'qa_seed')
+  ]);
+
+  return {
+    clients: finalCounts[0].count || 0,
+    projects: finalCounts[1].count || 0,
+    invoices: finalCounts[2].count || 0,
+    items: finalCounts[3].count || 0,
+    tasks: finalCounts[4].count || 0,
+    reminders: finalCounts[5].count || 0,
+    logs: finalCounts[6].count || 0
+  };
 }

@@ -6,6 +6,7 @@ import { codeSnapshotManager } from './codeSnapshot';
 import { create_message_log } from '@/data/collections';
 import { supabase } from '@/integrations/supabase/client';
 import { runSanityV2, type SanityV2Summary } from './sanityV2';
+import { featureTestRunner, FEATURE_TESTS, type FeatureTestResult, type FeatureTestSummary } from './featureTests';
 
 export interface TestRunSummary {
   totalTests: number;
@@ -349,6 +350,19 @@ export class QATestRunner {
   // New Sanity V2 runner integration
   async runSanityV2({ fix = false }: { fix?: boolean } = {}): Promise<SanityV2Summary> {
     return await runSanityV2({ fix });
+  }
+
+  // Feature Test Runner Integration
+  async runAllFeatureTests(): Promise<FeatureTestSummary> {
+    return await featureTestRunner.runAllTests();
+  }
+
+  async runSingleFeatureTest(testId: string): Promise<FeatureTestResult> {
+    return await featureTestRunner.runSingleTest(testId);
+  }
+
+  getFeatureTestResults(): FeatureTestResult[] {
+    return featureTestRunner.getLastResults();
   }
 }
 

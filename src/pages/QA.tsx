@@ -30,7 +30,8 @@ import type { QATestResult } from '@/qa/localStorage';
 import type { TestRunSummary } from '@/qa/testRunner';
 import { smokeTestRunner, type SmokeTestSummary } from '@/qa/smokeTests';
 import { featureTestRunner, FEATURE_TESTS, type FeatureTestResult, type FeatureTestSummary } from '@/qa/featureTests';
-import { seedDemoData } from '@/qa/demoSeed';
+import { seedDemoData, type SeedSummary } from '@/qa/demoSeed';
+import { resetDemo, type ResetSummary } from '@/qa/resetDemo';
 
 // Import Supabase and collections for demo data
 import { supabase } from '@/integrations/supabase/client';
@@ -74,6 +75,11 @@ export default function QA() {
   const [isRunningFeatureTests, setIsRunningFeatureTests] = useState(false);
   const [featureTestResults, setFeatureTestResults] = useState<FeatureTestResult[]>([]);
   const [featureTestSummary, setFeatureTestSummary] = useState<FeatureTestSummary | null>(null);
+  
+  // Demo Data Management State
+  const [isPopulatingDemo, setIsPopulatingDemo] = useState(false);
+  const [isResettingDemo, setIsResettingDemo] = useState(false);
+  const [seedSummary, setSeedSummary] = useState<SeedSummary | null>(null);
 
   useEffect(() => {
     // Load initial results
@@ -264,13 +270,13 @@ export default function QA() {
     });
   };
 
-  // Feature Tests Handlers
+  // Enhanced Feature Tests Handlers
   const handleRunFeatureTests = async () => {
     setIsRunningFeatureTests(true);
     setTestRunnerStatus('Running Feature Tests...');
     
     try {
-      const featureSummary = await featureTestRunner.runAllTests();
+      const featureSummary = await qaTestRunner.runAllFeatureTests();
       setFeatureTestResults(featureSummary.results);
       setFeatureTestSummary(featureSummary);
       
@@ -296,7 +302,7 @@ export default function QA() {
 
   const handleRunSingleFeatureTest = async (testId: string) => {
     try {
-      const result = await featureTestRunner.runSingleTest(testId);
+      const result = await qaTestRunner.runSingleFeatureTest(testId);
       setFeatureTestResults(prev => prev.map(r => r.id === testId ? result : r));
       
       toast({
@@ -318,10 +324,12 @@ export default function QA() {
     const featureResults = featureTestRunner.exportResults();
     
     const combinedExport = {
-      timestamp: new Date().toISOString(),
-      qaTests: qaResults,
+      executedAt: new Date().toISOString(),
+      sanityV2: sanityV2Summary,
       featureTests: featureResults,
+      qaTests: qaResults,
       smokeTests: smokeTestResults || null,
+      demoCounts: seedSummary,
       summary: {
         qaTestsPassed: results.filter(r => r.pass).length,
         qaTestsFailed: results.filter(r => !r.pass).length,
@@ -345,14 +353,64 @@ export default function QA() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `hustlehub-combined-qa-report-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `hustlehub-qa-hub-v2-report-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
     
     toast({
-      title: 'Combined Report Exported',
-      description: 'Complete QA, Feature, and Smoke test report downloaded successfully'
+      title: 'QA Hub v2 Report Exported',
+      description: 'Complete system test report downloaded successfully'
     });
+  };
+
+  // Demo Data Management Functions
+  const handlePopulateDemoData = async () => {
+    setIsPopulatingDemo(true);
+    try {
+      const summary = await seedDemoData();
+      setSeedSummary(summary);
+      await loadDemoDataCounts();
+      
+      toast({
+        title: 'Demo Data Populated',
+        description: `Created: ${summary.clients} clients, ${summary.invoices} invoices, ${summary.tasks} tasks`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Population Failed',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsPopulatingDemo(false);
+    }
+  };
+
+  const handleResetDemo = async () => {
+    setIsResettingDemo(true);
+    try {
+      const resetResult = await resetDemo();
+      if (resetResult.ok) {
+        const summary = await seedDemoData();
+        setSeedSummary(summary);
+        await loadDemoDataCounts();
+        
+        toast({
+          title: 'Demo Reset Complete',
+          description: `Cleared ${resetResult.tablesCleared.length} tables and re-seeded fresh data`,
+        });
+      } else {
+        throw new Error(resetResult.error || 'Reset failed');
+      }
+    } catch (error) {
+      toast({
+        title: 'Reset Failed',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsResettingDemo(false);
+    }
   };
 
   // Test Runner Functions

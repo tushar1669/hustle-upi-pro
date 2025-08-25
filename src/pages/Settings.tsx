@@ -180,7 +180,7 @@ export default function Settings() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6" data-testid="settings-form">
           {/* Business Information */}
           <Card>
             <CardHeader>
