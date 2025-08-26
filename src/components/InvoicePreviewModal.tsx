@@ -2,12 +2,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { X, Download, Printer, FileDown, Loader2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { X, Download, Printer, FileDown, Loader2, Copy, Share2, ExternalLink } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { settings_one, clients_all, client_detail, items_by_invoice } from "@/data/collections";
 import { generateInvoicePDF, downloadPDF } from "@/lib/pdfGenerator";
 import { toast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { formatINR, buildUpiIntent, buildInvoiceReminderText, buildWhatsAppUrl, sanitizePhone } from "@/services/payments";
+import { toDataURL } from "qrcode";
 
 interface InvoicePreviewModalProps {
   isOpen: boolean;
@@ -17,6 +20,7 @@ interface InvoicePreviewModalProps {
 
 export default function InvoicePreviewModal({ isOpen, onClose, invoice }: InvoicePreviewModalProps) {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [qrUrl, setQrUrl] = useState<string>("");
   const queryClient = useQueryClient();
   
   const { data: settings } = useQuery({ queryKey: ["settings_one"], queryFn: settings_one });
@@ -41,8 +45,60 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoice }: Invoic
   const client = clientDetails || clients.find((c: any) => c.id === invoice.client_id);
   const currency = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
+  // UPI Payment data
+  const clientName = invoice?.clients?.name || client?.name || "Client";
+  const phoneRaw = invoice?.clients?.whatsapp || client?.whatsapp || "";
+  const upiVpa = settings?.upi_vpa || "";
+  const bizName = settings?.creator_display_name || "HustleHub";
+  const amount = invoice?.total_amount || 0;
+  const invNo = invoice?.invoice_number || "—";
+  const dueISO = invoice?.due_date || new Date().toISOString().split("T")[0];
+  const status = invoice?.status || "draft";
+  const upiLink = upiVpa ? buildUpiIntent({ pa: upiVpa, pn: bizName, am: amount, tn: `INV ${invNo}` }) : "";
+  const { message } = buildInvoiceReminderText({
+    clientName: clientName,
+    invoiceNumber: invNo,
+    amountINR: amount,
+    dueDateISO: dueISO,
+    status: status as any,
+    upiVpa,
+    businessName: bizName
+  });
+
+  // Generate QR code
+  useEffect(() => {
+    if (!upiLink) { 
+      setQrUrl(""); 
+      return; 
+    }
+    toDataURL(upiLink, { margin: 1, width: 240 })
+      .then(setQrUrl)
+      .catch(() => setQrUrl(""));
+  }, [upiLink]);
+
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleCopyUpiLink = async () => {
+    try {
+      await navigator.clipboard.writeText(upiLink);
+      toast({
+        title: "UPI link copied",
+        description: "UPI payment link has been copied to clipboard.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to copy UPI link.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleWhatsAppShare = () => {
+    const url = buildWhatsAppUrl({ phone: sanitizePhone(phoneRaw), text: message });
+    window.open(url, "_blank");
   };
 
   const handleDownload = async () => {
@@ -228,6 +284,82 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoice }: Invoic
               </div>
             </div>
            )}
+
+          {/* UPI Payment Section */}
+          <Card data-testid="invoice-preview-card" className="border-2 border-primary/20">
+            <CardContent className="p-6">
+              <h3 className="text-lg font-semibold mb-4 text-primary">Pay via UPI</h3>
+              
+              {!upiVpa ? (
+                <Alert>
+                  <AlertDescription>
+                    Add UPI VPA in Settings to enable quick pay links.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <div className="space-y-4">
+                  <div className="text-sm text-muted-foreground">
+                    <span className="font-medium">Pay to:</span> {upiVpa}
+                  </div>
+                  
+                  <div className="text-xl font-bold text-primary">
+                    {formatINR(amount)}
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-3">
+                    <Button 
+                      asChild
+                      data-testid="btn-upi-open"
+                      className="flex-1 min-w-[120px]"
+                    >
+                      <a href={upiLink}>
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Open UPI App
+                      </a>
+                    </Button>
+                    
+                    <Button 
+                      variant="outline"
+                      onClick={handleCopyUpiLink}
+                      data-testid="btn-upi-copy"
+                      className="flex-1 min-w-[120px]"
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy UPI Link
+                    </Button>
+                    
+                    {phoneRaw && (
+                      <Button 
+                        variant="outline"
+                        onClick={handleWhatsAppShare}
+                        data-testid="btn-wa-share-invoice"
+                        className="flex-1 min-w-[120px]"
+                      >
+                        <Share2 className="h-4 w-4 mr-2" />
+                        Share on WhatsApp
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {qrUrl && (
+                    <div className="flex justify-center pt-4">
+                      <div className="bg-white p-4 rounded-lg border">
+                        <img 
+                          src={qrUrl} 
+                          alt="UPI QR Code" 
+                          data-testid="upi-qr"
+                          className="w-60 h-60"
+                        />
+                        <p className="text-center text-sm text-muted-foreground mt-2">
+                          Scan to pay with any UPI app
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Footer Message */}
           {(settings as any)?.footer_message && (
