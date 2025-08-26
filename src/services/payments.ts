@@ -43,12 +43,12 @@ export function buildUpiIntent(params: {
   tn?: string;
 }): string {
   const queryParams = new URLSearchParams();
-  queryParams.set("pa", encodeURIComponent(params.pa));
-  queryParams.set("pn", encodeURIComponent(params.pn));
-  queryParams.set("am", encodeURIComponent(String(params.am)));
+  queryParams.set("pa", params.pa);
+  queryParams.set("pn", params.pn);
+  queryParams.set("am", String(params.am));
   
   if (params.tn) {
-    queryParams.set("tn", encodeURIComponent(params.tn));
+    queryParams.set("tn", params.tn);
   }
   
   return `upi://pay?${queryParams.toString()}`;
