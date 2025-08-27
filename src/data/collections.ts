@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 /**
- * Tables: settings, clients, projects, invoices, invoice_items, tasks, reminders, message_log
+ * Tables: settings, clients, projects, invoices, invoice_items, tasks, reminders, message_log, savings_goals
  * View: v_dashboard_metrics
  */
 
@@ -536,6 +536,74 @@ export async function v_dashboard_metrics() {
     .maybeSingle();
   if (error) throw error;
   return data || { this_month_paid: 0, overdue_amount: 0, tasks_due_7d: 0 };
+}
+
+/* ============================ Savings Goals ============================ */
+export interface SavingsGoal {
+  id: string;
+  title: string;
+  target_amount: number;
+  saved_amount: number;
+  target_date: string | null; // YYYY-MM-DD or null
+  type: string | null;
+  created_at: string;
+}
+
+export async function savings_goals_all(): Promise<SavingsGoal[]> {
+  const { data, error } = await supabase
+    .from("savings_goals")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data as SavingsGoal[]) || [];
+}
+
+export async function create_savings_goal(payload: {
+  title: string;
+  target_amount: number;
+  saved_amount?: number; // default 0 at DB
+  target_date?: string | null;
+  type?: string | null;
+}): Promise<SavingsGoal> {
+  const { data, error } = await supabase
+    .from("savings_goals")
+    .insert({
+      title: payload.title,
+      target_amount: payload.target_amount,
+      saved_amount: payload.saved_amount ?? 0,
+      target_date: payload.target_date ?? null,
+      type: payload.type ?? null,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as SavingsGoal;
+}
+
+export async function update_savings_goal(
+  id: string,
+  changes: Partial<{
+    title: string;
+    target_amount: number;
+    saved_amount: number;
+    target_date: string | null;
+    type: string | null;
+  }>
+): Promise<SavingsGoal> {
+  const { data, error } = await supabase
+    .from("savings_goals")
+    .update(changes)
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as SavingsGoal;
+}
+
+export async function delete_savings_goal(id: string) {
+  const { error } = await supabase.from("savings_goals").delete().eq("id", id);
+  if (error) throw error;
+  return true;
 }
 
 /* ===================== High-level Paid Flow (Step 4) ===================== */
