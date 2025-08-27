@@ -1,11 +1,15 @@
 import { supabase } from "@/integrations/supabase/client";
 
 /**
- * Tables: settings, clients, projects, invoices, invoice_items, tasks, reminders, message_log, savings_goals
- * View: v_dashboard_metrics
+ * TEMP: helper to bypass typed .from() for tables missing in generated types
+ * (e.g., newly added `savings_goals`). Safe to remove once you regenerate types.
  */
+const fromAny = (table: string) => (supabase as any).from(table);
 
-/* ============================ Settings ============================ */
+// Tables: settings, clients, projects, invoices, invoice_items, tasks, reminders, message_log
+// View: v_dashboard_metrics
+
+// ============ Settings ============
 export interface SettingsData {
   creator_display_name: string;
   company_name: string | null;
@@ -30,7 +34,7 @@ export async function settings_one(): Promise<SettingsData | null> {
   return data;
 }
 
-/* ============================ Clients ============================ */
+// ============ Clients ============
 export async function clients_all() {
   const { data, error } = await supabase
     .from("clients")
@@ -90,7 +94,7 @@ export async function update_client(
   return data;
 }
 
-/* ============================ Projects ============================ */
+// ============ Projects ============
 export async function projects_all() {
   const { data, error } = await supabase.from("projects").select("*");
   if (error) throw error;
@@ -111,7 +115,7 @@ export async function create_project(payload: {
   return data;
 }
 
-/* ============================ Invoices ============================ */
+// ============ Invoices ============
 export async function invoices_all() {
   const { data, error } = await supabase
     .from("invoices")
@@ -191,7 +195,7 @@ export async function delete_invoice(id: string) {
   return true;
 }
 
-/** Fetch invoice with client + line items */
+// Add near other exports
 export async function invoice_with_items(invoiceId: string) {
   const { data: inv, error } = await supabase
     .from("invoices")
@@ -202,7 +206,7 @@ export async function invoice_with_items(invoiceId: string) {
   return inv;
 }
 
-/* ============================ Invoice Items ============================ */
+// ============ Invoice Items ============
 export async function items_by_invoice(invoice_id: string) {
   const { data, error } = await supabase
     .from("invoice_items")
@@ -235,7 +239,7 @@ export async function delete_item(id: string) {
   return true;
 }
 
-/* ============================ Tasks ============================ */
+// ============ Tasks ============
 export async function tasks_all() {
   const { data, error } = await supabase
     .from("tasks")
@@ -303,7 +307,7 @@ export async function delete_task(id: string) {
   return true;
 }
 
-/* ============================ Reminders ============================ */
+// ============ Reminders ============
 export async function reminders_all() {
   const { data, error } = await supabase
     .from("reminders")
@@ -367,13 +371,12 @@ export async function update_reminder(
 }
 
 /**
- * Update reminder status (no sent_at column in DB — do NOT write it).
- * We keep the 3rd arg for compatibility but ignore it safely.
+ * Update only the status of a reminder.
+ * NOTE: intentionally does NOT write a `sent_at` column (not present in schema).
  */
 export async function reminders_update_status(
   id: string,
-  status: "pending" | "sent" | "skipped",
-  _sent_at?: string
+  status: "pending" | "sent" | "skipped"
 ) {
   const { data, error } = await supabase
     .from("reminders")
@@ -475,19 +478,7 @@ export async function reminder_reschedule(id: string, scheduled_at: string) {
   return data;
 }
 
-/** Cancel all pending reminders for a given invoice (used after payment). */
-export async function reminders_cancel_pending_for_invoice(invoice_id: string) {
-  const { data, error } = await supabase
-    .from("reminders")
-    .update({ status: "skipped" })
-    .eq("invoice_id", invoice_id)
-    .eq("status", "pending")
-    .select("id");
-  if (error) throw error;
-  return data || [];
-}
-
-/* ============================ Message Log ============================ */
+// ============ Message Log ============
 export async function message_log_recent() {
   const { data, error } = await supabase
     .from("message_log")
@@ -527,7 +518,7 @@ export async function message_log_insert(payload: {
   return create_message_log(payload);
 }
 
-/* ============================ Dashboard View ============================ */
+// ============ Dashboard View ============
 export async function v_dashboard_metrics() {
   const { data, error } = await supabase
     .from("v_dashboard_metrics")
@@ -538,35 +529,33 @@ export async function v_dashboard_metrics() {
   return data || { this_month_paid: 0, overdue_amount: 0, tasks_due_7d: 0 };
 }
 
-/* ============================ Savings Goals ============================ */
+// ============ Savings Goals (untyped until Supabase types are regenerated) ============
 export interface SavingsGoal {
   id: string;
   title: string;
   target_amount: number;
   saved_amount: number;
-  target_date: string | null; // YYYY-MM-DD or null
+  target_date: string | null;
   type: string | null;
   created_at: string;
 }
 
 export async function savings_goals_all(): Promise<SavingsGoal[]> {
-  const { data, error } = await supabase
-    .from("savings_goals")
+  const { data, error } = await fromAny("savings_goals")
     .select("*")
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data as SavingsGoal[]) || [];
+  return (data as unknown as SavingsGoal[]) || [];
 }
 
 export async function create_savings_goal(payload: {
   title: string;
   target_amount: number;
-  saved_amount?: number; // default 0 at DB
+  saved_amount?: number;
   target_date?: string | null;
   type?: string | null;
 }): Promise<SavingsGoal> {
-  const { data, error } = await supabase
-    .from("savings_goals")
+  const { data, error } = await fromAny("savings_goals")
     .insert({
       title: payload.title,
       target_amount: payload.target_amount,
@@ -577,7 +566,7 @@ export async function create_savings_goal(payload: {
     .select("*")
     .single();
   if (error) throw error;
-  return data as SavingsGoal;
+  return data as unknown as SavingsGoal;
 }
 
 export async function update_savings_goal(
@@ -590,74 +579,17 @@ export async function update_savings_goal(
     type: string | null;
   }>
 ): Promise<SavingsGoal> {
-  const { data, error } = await supabase
-    .from("savings_goals")
+  const { data, error } = await fromAny("savings_goals")
     .update(changes)
     .eq("id", id)
     .select("*")
     .single();
   if (error) throw error;
-  return data as SavingsGoal;
+  return data as unknown as SavingsGoal;
 }
 
 export async function delete_savings_goal(id: string) {
-  const { error } = await supabase.from("savings_goals").delete().eq("id", id);
+  const { error } = await fromAny("savings_goals").delete().eq("id", id);
   if (error) throw error;
   return true;
-}
-
-/* ===================== High-level Paid Flow (Step 4) ===================== */
-/**
- * Mark an invoice as paid, cancel its pending reminders, and log.
- * Returns the updated invoice + number of cancelled reminders + amount recorded.
- */
-export async function invoice_mark_paid(
-  invoice_id: string,
-  params: { paid_date: string; utr_reference?: string | null; amount_paid?: number | null }
-) {
-  // fetch invoice
-  const { data: inv, error: invErr } = await supabase
-    .from("invoices")
-    .select("*")
-    .eq("id", invoice_id)
-    .single();
-  if (invErr) throw invErr;
-
-  const amount = params.amount_paid ?? inv.total_amount ?? 0;
-
-  // update invoice
-  const { data: updated, error: upErr } = await supabase
-    .from("invoices")
-    .update({
-      status: "paid",
-      paid_date: params.paid_date,
-      utr_reference: params.utr_reference ?? null,
-    })
-    .eq("id", invoice_id)
-    .select("*")
-    .single();
-  if (upErr) throw upErr;
-
-  // cancel pending reminders
-  const cancelled = await reminders_cancel_pending_for_invoice(invoice_id);
-
-  // logs
-  await create_message_log({
-    related_type: "invoice",
-    related_id: invoice_id,
-    channel: "whatsapp",
-    template_used: "invoice_mark_paid",
-    outcome: "ok",
-  });
-  if (cancelled.length > 0) {
-    await create_message_log({
-      related_type: "invoice",
-      related_id: invoice_id,
-      channel: "whatsapp",
-      template_used: "reminders_cancelled_after_payment",
-      outcome: `skipped_${cancelled.length}`,
-    });
-  }
-
-  return { invoice: updated, cancelledCount: cancelled.length, amount };
 }
