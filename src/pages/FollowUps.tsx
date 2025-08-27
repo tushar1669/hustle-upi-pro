@@ -26,6 +26,7 @@ import {
 import { sendReminderViaWhatsApp } from "@/lib/reminderActions";
 import { useToast } from "@/hooks/use-toast";
 import { useCelebrationContext } from "@/components/CelebrationProvider";
+import { buildInvoiceReminderText, formatINR, buildWhatsAppUrl, sanitizePhone } from "@/services/payments";
 import { FollowUpPreviewDrawer } from "@/components/FollowUpPreviewDrawer";
 import { RescheduleDialog } from "@/components/RescheduleDialog";
 import QuickFollowupModal from "@/components/followups/QuickFollowupModal";
@@ -72,6 +73,8 @@ export default function FollowUps() {
     reminder?: any; 
     invoice?: any; 
     client?: any; 
+    settings?: any;
+    composed?: { message: string; upiIntent: string };
   }>({ isOpen: false });
   const [rescheduleDialog, setRescheduleDialog] = useState<{ 
     isOpen: boolean; 
@@ -160,11 +163,24 @@ export default function FollowUps() {
       
       if (!invoice || !client) return;
       
+      // Generate composed message and UPI intent
+      const { message, upiIntent } = buildInvoiceReminderText({
+        clientName: client.name,
+        invoiceNumber: invoice.invoice_number,
+        amountINR: invoice.total_amount,
+        dueDateISO: invoice.due_date,
+        status: invoice.status,
+        upiVpa: settings?.upi_vpa || "",
+        businessName: settings?.creator_display_name || "HustleHub"
+      });
+      
       setPreviewDrawer({ 
         isOpen: true, 
         reminder, 
         invoice, 
-        client 
+        client,
+        settings,
+        composed: { message, upiIntent }
       });
       return;
     }
@@ -192,18 +208,45 @@ export default function FollowUps() {
 
   const [sending, setSending] = useState(false);
 
-  const handleConfirmSend = async () => {
-    const { reminder } = previewDrawer;
-    if (!reminder) return;
+  const handleConfirmSend = async (customMessage?: string) => {
+    const { reminder, invoice, client } = previewDrawer;
+    if (!reminder || !invoice || !client) return;
 
     setSending(true);
     try {
-      await sendReminderViaWhatsApp(reminder);
+      // Use custom message or fallback to sendReminderViaWhatsApp
+      if (customMessage) {
+        if (!client.whatsapp) {
+          toast({ title: "Client has no WhatsApp number", variant: "destructive" });
+          return;
+        }
+        
+        const url = buildWhatsAppUrl({ 
+          phone: sanitizePhone(client.whatsapp), 
+          text: customMessage 
+        });
+        window.open(url, "_blank");
+        
+        // Update reminder status and log
+        await reminders_update_status(reminder.id, 'sent', new Date().toISOString());
+        await create_message_log({
+          related_type: 'invoice',
+          related_id: invoice.id,
+          channel: 'whatsapp',
+          template_used: 'reminder_sent',
+          outcome: 'sent'
+        });
+      } else {
+        await sendReminderViaWhatsApp(reminder);
+      }
+      
       toast({ title: "Reminder sent" });
       setPreviewDrawer({ isOpen: false });
       // Invalidate data used by the page/QA
       queryClient.invalidateQueries({ queryKey: ["all_reminders"] });
       queryClient.invalidateQueries({ queryKey: ["message_log_recent"] });
+      queryClient.invalidateQueries({ queryKey: CACHE_KEYS.REMINDERS });
+      queryClient.invalidateQueries({ queryKey: CACHE_KEYS.MESSAGES });
     } catch (e: any) {
       toast({ title: "Error sending reminder", description: e?.message ?? "Unknown error", variant: "destructive" });
     } finally {
@@ -678,9 +721,9 @@ export default function FollowUps() {
         reminder={previewDrawer.reminder}
         invoice={previewDrawer.invoice}
         client={previewDrawer.client}
-        settings={settings}
+        settings={previewDrawer.settings}
+        composed={previewDrawer.composed}
         onConfirm={handleConfirmSend}
-        data-testid="btn-confirm-send"
       />
 
       {/* Reschedule Dialog */}

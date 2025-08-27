@@ -1,8 +1,5 @@
 import { settings_one, clients_all, invoice_with_items, update_reminder, create_message_log } from "@/data/collections";
-
-function currencyINR(n: number) {
-  return `₹${Number(n||0).toLocaleString("en-IN")}`;
-}
+import { buildInvoiceReminderText, buildWhatsAppUrl, sanitizePhone } from "@/services/payments";
 
 export async function sendReminderViaWhatsApp(reminder: any) {
   // Load all required data
@@ -17,34 +14,22 @@ export async function sendReminderViaWhatsApp(reminder: any) {
     throw new Error("Business UPI settings are missing (Settings → UPI & Branding).");
   }
 
-  // Compose message
-  const daysOver =
-    invoice.status === "paid"
-      ? 0
-      : Math.max(0, Math.ceil((Date.now() - new Date(invoice.due_date).getTime()) / 86400000));
+  // Generate message using payment helpers
+  const { message, upiIntent } = buildInvoiceReminderText({
+    clientName: client.name,
+    invoiceNumber: invoice.invoice_number,
+    amountINR: invoice.total_amount,
+    dueDateISO: invoice.due_date,
+    status: invoice.status,
+    upiVpa: settings.upi_vpa,
+    businessName: settings.creator_display_name
+  });
 
-  const dueStr =
-    invoice.status === "paid"
-      ? "This invoice is already marked as paid."
-      : (daysOver > 0
-         ? `${daysOver} days overdue`
-         : `due on ${new Date(invoice.due_date).toLocaleDateString()}`);
-
-  const upiLink = `upi://pay?pa=${encodeURIComponent(settings.upi_vpa)}&pn=${encodeURIComponent(settings.creator_display_name)}&am=${encodeURIComponent(invoice.total_amount)}&tn=${encodeURIComponent(`INV ${invoice.invoice_number}`)}`;
-
-  const msg =
-`Hi ${client.name},
-
-Just a reminder for *Invoice ${invoice.invoice_number}* — ${currencyINR(invoice.total_amount)} (${dueStr}).
-
-You can pay securely via UPI:
-${upiLink}
-
-Thank you!`;
-
-  // Launch WhatsApp in a new tab
-  const phone = String(client.whatsapp).replace(/\D/g, "");
-  const wa = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+  // Launch WhatsApp in a new tab using payment helpers
+  const wa = buildWhatsAppUrl({ 
+    phone: sanitizePhone(client.whatsapp), 
+    text: message 
+  });
   window.open(wa, "_blank");
 
   // Update reminder + log
