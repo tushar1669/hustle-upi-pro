@@ -205,7 +205,7 @@ export async function reminders_all() {
       id, invoice_id, scheduled_at, channel, status,
       invoices!inner(
         id, invoice_number, total_amount, due_date, 
-        clients!inner(id, name)
+        clients!inner(id, name, whatsapp)
       )
     `)
     .order("scheduled_at", { ascending: true });
@@ -252,7 +252,7 @@ export async function reminders_by_filters(filters: {
       id, invoice_id, scheduled_at, channel, status,
       invoices!inner(
         id, invoice_number, total_amount, due_date, status,
-        clients!inner(id, name)
+        clients!inner(id, name, whatsapp)
       )
     `);
 

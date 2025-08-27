@@ -46,7 +46,7 @@ export function FollowUpPreviewDrawer({
   const stage = daysOverdue <= 3 ? 'gentle' : daysOverdue <= 14 ? 'professional' : 'firm';
   
   const isWhatsApp = reminder.channel === 'whatsapp';
-  const hasWhatsApp = Boolean(client.whatsapp);
+  const hasWhatsApp = Boolean(sanitizePhone(client.whatsapp || ""));
   const hasUpiVpa = Boolean(settings?.upi_vpa);
 
   const handleRebuildMessage = () => {
@@ -72,8 +72,13 @@ export function FollowUpPreviewDrawer({
   };
 
   const handleOpenUpi = () => {
-    if (composed?.upiIntent) {
-      window.open(composed.upiIntent, "_blank");
+    if (!composed?.upiIntent) return;
+    try {
+      window.location.href = composed.upiIntent; // trigger UPI handler in same tab
+    } catch {
+      // fallback: copy link and toast
+      navigator.clipboard.writeText(composed.upiIntent);
+      toast({ title: "UPI link copied (fallback)" });
     }
   };
 
@@ -87,7 +92,7 @@ export function FollowUpPreviewDrawer({
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent className="w-[500px] sm:w-[540px]">
+      <SheetContent className="w-[500px] sm:w-[540px] max-h-[85vh] overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             {isWhatsApp ? <MessageSquare className="h-5 w-5" /> : <Mail className="h-5 w-5" />}
@@ -108,7 +113,7 @@ export function FollowUpPreviewDrawer({
 
           {/* Alert for missing WhatsApp */}
           {!hasWhatsApp && isWhatsApp && (
-            <Alert variant="destructive">
+            <Alert variant="destructive" data-testid="fu-alert-missing-wa">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
                 Client has no WhatsApp number configured. Cannot send reminder.
@@ -219,6 +224,7 @@ export function FollowUpPreviewDrawer({
                   size="sm" 
                   onClick={handleOpenUpi}
                   className="w-full"
+                  data-testid="btn-upi-open"
                 >
                   <ExternalLink className="h-4 w-4 mr-2" />
                   Open UPI Payment

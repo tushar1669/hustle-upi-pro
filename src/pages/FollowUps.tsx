@@ -158,18 +158,17 @@ export default function FollowUps() {
   // Action handlers
   const handleSendNow = async (reminder: any, skipPreview = false) => {
     if (!skipPreview) {
-      const invoice = reminder.invoices || findInvoice(reminder.invoice_id);
-      const client = invoice?.clients || findClient(reminder.invoice_id);
-      
-      if (!invoice || !client) return;
+      const inv = reminder.invoices || findInvoice(reminder.invoice_id);
+      const cli = inv?.clients?.whatsapp ? inv.clients : clients.find((c:any) => c.id === inv?.client_id);
+      if (!inv || !cli) return;
       
       // Generate composed message and UPI intent
-      const { message, upiIntent } = buildInvoiceReminderText({
-        clientName: client.name,
-        invoiceNumber: invoice.invoice_number,
-        amountINR: invoice.total_amount,
-        dueDateISO: invoice.due_date,
-        status: invoice.status,
+      const composed = buildInvoiceReminderText({
+        clientName: cli.name,
+        invoiceNumber: inv.invoice_number,
+        amountINR: inv.total_amount,
+        dueDateISO: inv.due_date,
+        status: inv.status,
         upiVpa: settings?.upi_vpa || "",
         businessName: settings?.creator_display_name || "HustleHub"
       });
@@ -177,10 +176,10 @@ export default function FollowUps() {
       setPreviewDrawer({ 
         isOpen: true, 
         reminder, 
-        invoice, 
-        client,
+        invoice: inv, 
+        client: cli,
         settings,
-        composed: { message, upiIntent }
+        composed
       });
       return;
     }
