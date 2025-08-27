@@ -186,7 +186,7 @@ export default function FollowUps() {
 
     try {
       // Update reminder status to sent
-      await reminders_update_status(reminder.id, 'sent', new Date().toISOString());
+      await reminders_update_status(reminder.id, 'sent');
       
       // Log the action
       await create_message_log({
@@ -227,7 +227,7 @@ export default function FollowUps() {
         window.open(url, "_blank");
         
         // Update reminder status and log
-        await reminders_update_status(reminder.id, 'sent', new Date().toISOString());
+        await reminders_update_status(reminder.id, 'sent');
         await create_message_log({
           related_type: 'invoice',
           related_id: invoice.id,
