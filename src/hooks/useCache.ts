@@ -36,6 +36,13 @@ export const invalidateClientCaches = (queryClient: any) => {
   ]);
 };
 
+export const invalidateSavingsGoalsCaches = (queryClient: any) => {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: CACHE_KEYS.SAVINGS_GOALS }),
+    queryClient.invalidateQueries({ queryKey: CACHE_KEYS.DASHBOARD })
+  ]);
+};
+
 export const invalidateAllCaches = (queryClient: any) => {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: CACHE_KEYS.SETTINGS }),
@@ -44,6 +51,7 @@ export const invalidateAllCaches = (queryClient: any) => {
     queryClient.invalidateQueries({ queryKey: CACHE_KEYS.INVOICES }),
     queryClient.invalidateQueries({ queryKey: CACHE_KEYS.TASKS }),
     queryClient.invalidateQueries({ queryKey: CACHE_KEYS.DASHBOARD }),
-    queryClient.invalidateQueries({ queryKey: CACHE_KEYS.MESSAGES })
+    queryClient.invalidateQueries({ queryKey: CACHE_KEYS.MESSAGES }),
+    queryClient.invalidateQueries({ queryKey: CACHE_KEYS.SAVINGS_GOALS })
   ]);
 };

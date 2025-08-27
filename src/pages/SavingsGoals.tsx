@@ -51,6 +51,7 @@ const SavingsGoals = () => {
     try {
       await delete_savings_goal(goalId);
       queryClient.invalidateQueries({ queryKey: CACHE_KEYS.SAVINGS_GOALS });
+      queryClient.invalidateQueries({ queryKey: CACHE_KEYS.DASHBOARD });
       toast({ title: "Goal deleted successfully" });
     } catch (error: any) {
       toast({
@@ -66,6 +67,7 @@ const SavingsGoals = () => {
 
   const handleModalSave = () => {
     queryClient.invalidateQueries({ queryKey: CACHE_KEYS.SAVINGS_GOALS });
+    queryClient.invalidateQueries({ queryKey: CACHE_KEYS.DASHBOARD });
     setEditingGoal(null);
   };
 
@@ -121,7 +123,7 @@ const SavingsGoals = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">{totalGoals}</div>
+            <div className="text-2xl font-bold text-primary" data-testid="sg-total-target">{totalGoals}</div>
             <p className="text-xs text-muted-foreground">goals created</p>
           </CardContent>
         </Card>
@@ -134,7 +136,7 @@ const SavingsGoals = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success">₹{totalSaved.toLocaleString("en-IN")}</div>
+            <div className="text-2xl font-bold text-success" data-testid="sg-total-saved">₹{totalSaved.toLocaleString("en-IN")}</div>
             <p className="text-xs text-muted-foreground">across all goals</p>
           </CardContent>
         </Card>
@@ -147,7 +149,7 @@ const SavingsGoals = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-accent">{averageProgress.toFixed(1)}%</div>
+            <div className="text-2xl font-bold text-accent" data-testid="sg-total-progress">{averageProgress.toFixed(1)}%</div>
             <p className="text-xs text-muted-foreground">completion rate</p>
           </CardContent>
         </Card>

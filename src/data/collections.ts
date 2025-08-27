@@ -231,11 +231,8 @@ export async function update_reminder(id: string, changes: Partial<{ status: "pe
   return data;
 }
 
-export async function reminders_update_status(id: string, status: "pending" | "sent" | "skipped", sent_at?: string) {
-  const changes: any = { status };
-  if (sent_at) changes.sent_at = sent_at;
-  
-  const { data, error } = await supabase.from("reminders").update(changes).eq("id", id).select("*").single();
+export async function reminders_update_status(id: string, status: "pending" | "sent" | "skipped") {
+  const { data, error } = await supabase.from("reminders").update({ status }).eq("id", id).select("*").single();
   if (error) throw error;
   return data;
 }
