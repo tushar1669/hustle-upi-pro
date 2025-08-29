@@ -362,7 +362,8 @@ export class QATestRunner {
   }
 
   getFeatureTestResults(): FeatureTestResult[] {
-    return featureTestRunner.getLastResults();
+    const summary = featureTestRunner.getLastResults();
+    return summary?.results || [];
   }
 }
 
