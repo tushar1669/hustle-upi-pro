@@ -92,6 +92,7 @@ export async function seedDemoData(): Promise<SeedSummary> {
     await update_invoice(paid.id, { paid_date: new Date().toISOString().split('T')[0], utr_reference: "UTR-DEMO-001" });
   }
 
+  // Ensure at least one open task with mark-done capability
   await create_task({
     title: "Prepare Project Proposal",
     due_date: new Date(Date.now() + 2 * 864e5).toISOString().split('T')[0],
@@ -99,14 +100,35 @@ export async function seedDemoData(): Promise<SeedSummary> {
     is_billable: false
   });
 
-  const { data: aSent } = await supabase.from("invoices").select("id").eq("status", "sent").limit(1);
-  if (aSent?.[0]) {
-    await create_reminder({
-      invoice_id: aSent[0].id,
-      scheduled_at: new Date(Date.now() + 864e5).toISOString(),
-      channel: "whatsapp",
-      status: "pending"
-    });
+  // Create additional open task for testing
+  await create_task({
+    title: "Review QA Test Data",
+    due_date: new Date(Date.now() + 1 * 864e5).toISOString().split('T')[0],
+    status: "open",
+    is_billable: true
+  });
+
+  // Ensure reminders exist for follow-ups testing
+  const { data: sentInvoices } = await supabase.from("invoices").select("id").eq("status", "sent");
+  if (sentInvoices && sentInvoices.length > 0) {
+    for (const sentInvoice of sentInvoices.slice(0, 2)) {
+      // Check if reminder already exists for this invoice
+      const { data: existingReminder } = await supabase
+        .from("reminders")
+        .select("id")
+        .eq("invoice_id", sentInvoice.id)
+        .eq("status", "pending")
+        .single();
+      
+      if (!existingReminder) {
+        await create_reminder({
+          invoice_id: sentInvoice.id,
+          scheduled_at: new Date(Date.now() + 864e5).toISOString(),
+          channel: "whatsapp",
+          status: "pending"
+        });
+      }
+    }
   }
 
   await create_message_log({
@@ -170,17 +192,17 @@ export async function seedDemoData(): Promise<SeedSummary> {
         amount: 50000 
       });
       
-      // Create reminders for the overdue invoice
+      // Create multiple reminders for the overdue invoice
       await create_reminder({
         invoice_id: overdue.id,
-        scheduled_at: new Date(Date.now() + 3 * 864e5).toISOString(), // 3 days from now
+        scheduled_at: new Date(Date.now() + 1 * 864e5).toISOString(), // 1 day from now (more immediate for testing)
         channel: "whatsapp",
         status: "pending"
       });
       
       await create_reminder({
         invoice_id: overdue.id,
-        scheduled_at: new Date(Date.now() + 7 * 864e5).toISOString(), // 7 days from now
+        scheduled_at: new Date(Date.now() + 3 * 864e5).toISOString(), // 3 days from now
         channel: "whatsapp", 
         status: "pending"
       });

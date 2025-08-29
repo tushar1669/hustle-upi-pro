@@ -83,8 +83,8 @@ export function note(message: string): string {
 }
 
 // Enhanced navigation helper with wait
-export function gotoAndWait(path: string, selector: string, timeout: number = 2000): Promise<boolean> {
-  return goto(path).then(() => waitFor(selector, timeout));
+export function gotoAndWait(path: string, waitForTestId: string, timeout: number = 8000): Promise<boolean> {
+  return goto(path).then(() => waitFor(`[data-testid="${waitForTestId}"]`, timeout));
 }
 
 // Ensure return to QA page after test
@@ -102,6 +102,29 @@ export async function runWithQaReturn<T>(fn: () => Promise<T>): Promise<T> {
     return await fn();
   } finally {
     await ensureReturnToQA();
+  }
+}
+
+// Stub window.open to prevent external tabs during tests
+export let originalWindowOpen: ((url?: string | URL | undefined, target?: string | undefined, features?: string | undefined) => Window | null) | null = null;
+
+export function stubWindowOpen(): void {
+  if (!originalWindowOpen) {
+    originalWindowOpen = window.open;
+    window.open = (url?: string | URL | undefined) => {
+      console.debug('[QA] stubbed window.open', url);
+      if (url) {
+        window.location.href = url.toString();
+      }
+      return null;
+    };
+  }
+}
+
+export function restoreWindowOpen(): void {
+  if (originalWindowOpen) {
+    window.open = originalWindowOpen;
+    originalWindowOpen = null;
   }
 }
 

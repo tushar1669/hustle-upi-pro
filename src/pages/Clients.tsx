@@ -70,7 +70,7 @@ export default function Clients() {
         <h1 className="text-2xl font-semibold">Clients</h1>
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button data-testid="btn-add-client">
               <Plus className="h-4 w-4 mr-2" />
               Add Client
             </Button>
@@ -126,7 +126,7 @@ export default function Clients() {
                 <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit">Create Client</Button>
+                <Button type="submit" data-testid="btn-client-add-submit">Create Client</Button>
               </div>
             </form>
           </DialogContent>
@@ -149,7 +149,7 @@ export default function Clients() {
             </TableHeader>
             <TableBody>
               {clients.map((c) => (
-                <TableRow key={c.id}>
+                <TableRow key={c.id} data-testid="client-row">
                   <TableCell className="font-medium">{c.name}</TableCell>
                   <TableCell>{c.whatsapp || "—"}</TableCell>
                   <TableCell>{c.email || "—"}</TableCell>
