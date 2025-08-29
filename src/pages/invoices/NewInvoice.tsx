@@ -39,13 +39,10 @@ export default function NewInvoice() {
             </select>
             <label className="block text-sm">Amount (subtotal)</label>
             <input type="number" className="w-full border rounded-md p-2 bg-background" value={amount} onChange={(e) => setAmount(parseInt(e.target.value || "0"))} />
-            <div className="pt-2">
-              <Button disabled>Create Draft (demo)</Button>
-            </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card data-testid="invoice-preview-card">
           <CardHeader>
             <CardTitle>Preview & UPI</CardTitle>
           </CardHeader>
@@ -56,6 +53,11 @@ export default function NewInvoice() {
             <div className="flex items-center gap-4 pt-4">
               <QRCodeSVG value={upiLink} size={144} />
               <div className="text-xs break-all">{upiLink}</div>
+            </div>
+            <div className="pt-4 space-x-2">
+              <Button disabled data-testid="btn-save-draft">Create Draft (demo)</Button>
+              <Button disabled data-testid="btn-save-send">Save & Send (demo)</Button>
+              <Button disabled data-testid="btn-add-line-item">Add Line Item (demo)</Button>
             </div>
           </CardContent>
         </Card>

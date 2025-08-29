@@ -303,7 +303,7 @@ Thank you!`;
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" data-testid="invoice-menu">
+                            <DropdownMenuContent align="end">
                               <DropdownMenuItem
                                 data-testid="invoice-menu-preview"
                                 onClick={() => handlePreview(invoice)}

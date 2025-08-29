@@ -82,6 +82,29 @@ export function note(message: string): string {
   return message;
 }
 
+// Enhanced navigation helper with wait
+export function gotoAndWait(path: string, selector: string, timeout: number = 2000): Promise<boolean> {
+  return goto(path).then(() => waitFor(selector, timeout));
+}
+
+// Ensure return to QA page after test
+export function ensureReturnToQA(): Promise<boolean> {
+  const QA_PATH = '/qa';
+  if (window.location.pathname !== QA_PATH) {
+    return goto(QA_PATH).then(() => waitFor('[data-testid="qa-feature-tests-table"]', 3000));
+  }
+  return Promise.resolve(true);
+}
+
+// Run function and always return to QA
+export async function runWithQaReturn<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } finally {
+    await ensureReturnToQA();
+  }
+}
+
 // Timing helper
 export function measureTime<T>(fn: () => Promise<T>): Promise<{ result: T; timeMs: number }> {
   const start = performance.now();

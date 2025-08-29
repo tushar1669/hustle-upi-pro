@@ -467,12 +467,12 @@ export default function Tasks() {
                       >
                         <Edit3 className="h-4 w-4" />
                       </Button>
-                      {t.status === "open" && (
-                        <Button size="sm" variant="outline" onClick={() => handleMarkDone(t.id)}>
-                          <Check className="h-4 w-4 mr-1" />
-                          Done
-                        </Button>
-                      )}
+                       {t.status === "open" && (
+                         <Button size="sm" variant="outline" onClick={() => handleMarkDone(t.id)} data-testid="task-mark-done">
+                           <Check className="h-4 w-4 mr-1" />
+                           Done
+                         </Button>
+                       )}
                     </TableCell>
                   </TableRow>
                 ))}

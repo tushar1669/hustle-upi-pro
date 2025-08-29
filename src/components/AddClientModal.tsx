@@ -102,7 +102,7 @@ export default function AddClientModal({ isOpen, onClose, onSuccess }: AddClient
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit">Create Client</Button>
+            <Button type="submit" data-testid="btn-client-add-submit">Create Client</Button>
           </div>
         </form>
       </DialogContent>
