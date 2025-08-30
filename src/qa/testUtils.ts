@@ -8,6 +8,11 @@ export interface TestResult {
   timeMs: number;
 }
 
+// Centralized selector building for test-ids
+export function byTestId(id: string): string {
+  return `[data-testid="${id}"]`;
+}
+
 // Navigation helper
 export function goto(path: string): Promise<void> {
   return new Promise((resolve) => {
@@ -18,10 +23,10 @@ export function goto(path: string): Promise<void> {
   });
 }
 
-// Click element by data-testid
-export function clickTestId(testId: string): Promise<boolean> {
+// Click element by data-testid using selector helper
+export function clickTestIdBySelector(selector: string): Promise<boolean> {
   return new Promise((resolve) => {
-    const element = document.querySelector(`[data-testid="${testId}"]`) as HTMLElement;
+    const element = document.querySelector(selector) as HTMLElement;
     if (element) {
       element.click();
       setTimeout(() => resolve(true), 50);
@@ -31,14 +36,24 @@ export function clickTestId(testId: string): Promise<boolean> {
   });
 }
 
-// Query all elements by data-testid
-export function queryAllTestId(testId: string): NodeListOf<Element> {
-  return document.querySelectorAll(`[data-testid="${testId}"]`);
+// Click element by data-testid (using centralized helper)
+export function clickTestId(testId: string): Promise<boolean> {
+  return clickTestIdBySelector(byTestId(testId));
 }
 
-// Query single element by data-testid
+// Query all elements by data-testid (using centralized helper)
+export function queryAllTestId(testId: string): NodeListOf<Element> {
+  return document.querySelectorAll(byTestId(testId));
+}
+
+// Query single element by data-testid (using centralized helper)
 export function queryTestId(testId: string): Element | null {
-  return document.querySelector(`[data-testid="${testId}"]`);
+  return document.querySelector(byTestId(testId));
+}
+
+// Test-id specific helpers
+export function waitForTestId(testId: string, timeout: number = 2000): Promise<boolean> {
+  return waitFor(byTestId(testId), timeout);
 }
 
 // Wait for condition or selector
@@ -82,16 +97,16 @@ export function note(message: string): string {
   return message;
 }
 
-// Enhanced navigation helper with wait
-export function gotoAndWait(path: string, waitForTestId: string, timeout: number = 8000): Promise<boolean> {
-  return goto(path).then(() => waitFor(`[data-testid="${waitForTestId}"]`, timeout));
+// Enhanced navigation helper with wait (using centralized helper)
+export function gotoAndWait(path: string, testId: string, timeout: number = 8000): Promise<boolean> {
+  return goto(path).then(() => waitForTestId(testId, timeout));
 }
 
-// Ensure return to QA page after test
+// Ensure return to QA page after test (using centralized helper)
 export function ensureReturnToQA(): Promise<boolean> {
   const QA_PATH = '/qa';
   if (window.location.pathname !== QA_PATH) {
-    return goto(QA_PATH).then(() => waitFor('[data-testid="qa-feature-tests-table"]', 3000));
+    return goto(QA_PATH).then(() => waitForTestId('qa-feature-tests-table', 3000));
   }
   return Promise.resolve(true);
 }
@@ -105,16 +120,22 @@ export async function runWithQaReturn<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-// Stub window.open to prevent external tabs during tests
+// Enhanced window.open stubbing that redirects to current window
 export let originalWindowOpen: ((url?: string | URL | undefined, target?: string | undefined, features?: string | undefined) => Window | null) | null = null;
 
 export function stubWindowOpen(): void {
   if (!originalWindowOpen) {
     originalWindowOpen = window.open;
     window.open = (url?: string | URL | undefined) => {
-      console.debug('[QA] stubbed window.open', url);
-      if (url) {
-        window.location.href = url.toString();
+      console.debug('[QA] stubbed window.open, redirecting to current window', url);
+      if (url && typeof url === 'string') {
+        // For external URLs, redirect in current window
+        if (url.startsWith('http') || url.startsWith('upi://')) {
+          console.debug('[QA] external URL detected, stubbing as no-op');
+          return null;
+        }
+        // For internal URLs, navigate in current window
+        window.location.href = url;
       }
       return null;
     };
@@ -188,13 +209,14 @@ export function fillInput(selector: string, value: string): boolean {
   return false;
 }
 
-// Check if element exists and is clickable
+// Check if element exists and is clickable (using centralized helper)
 export function isClickable(testId: string): boolean {
-  const element = document.querySelector(`[data-testid="${testId}"]`) as HTMLElement;
+  const selector = byTestId(testId);
+  const element = document.querySelector(selector) as HTMLElement;
   if (!element) return false;
   
   const style = window.getComputedStyle(element);
   return style.pointerEvents !== 'none' && 
          !element.hasAttribute('disabled') &&
-         isVisible(`[data-testid="${testId}"]`);
+         isVisible(selector);
 }

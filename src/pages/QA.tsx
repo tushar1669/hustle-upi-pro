@@ -357,7 +357,7 @@ export default function QA() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
+          <Table data-testid="qa-feature-tests-table">
             <TableHeader>
               <TableRow>
                 <TableHead>Test</TableHead>

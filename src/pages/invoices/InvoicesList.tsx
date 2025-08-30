@@ -407,6 +407,7 @@ Thank you!`;
             setSelectedPreviewInvoice(null);
           }}
           invoice={selectedPreviewInvoice}
+          data-testid="invoice-preview-modal"
         />
       )}
     </div>
