@@ -7,6 +7,8 @@ import { create_message_log } from '@/data/collections';
 import { supabase } from '@/integrations/supabase/client';
 import { runSanityV2, type SanityV2Summary } from './sanityV2';
 import { featureTestRunner, FEATURE_TESTS, type FeatureTestResult, type FeatureTestSummary } from './featureTests';
+import { ensureDemoData } from './demoSeed';
+import { ensureReturnToQA } from './testUtils';
 
 export interface TestRunSummary {
   totalTests: number;
@@ -36,10 +38,21 @@ export class QATestRunner {
     return this.fixMode;
   }
 
+  private seedGuard = false; // Prevent multiple seeds per batch
+
   async runSingleTest(testId: string): Promise<QATestResult> {
     const test = QA_TESTS.find(t => t.id === testId);
     if (!test) {
       throw new Error(`Test not found: ${testId}`);
+    }
+
+    // ====== GUARDED AUTO-SEED (once per batch) ======
+    if (!this.seedGuard) {
+      console.log('[QA] Auto-seeding for single test run...');
+      await ensureDemoData();
+      this.seedGuard = true;
+      // Reset guard after a delay to allow new batches
+      setTimeout(() => { this.seedGuard = false; }, 5000);
     }
 
     const startTime = Date.now();
@@ -149,6 +162,10 @@ export class QATestRunner {
     setQAFixesEnabled(this.fixMode);
 
     try {
+      // ====== AUTO-SEED BEFORE EVERY RUN ======
+      console.log('[QA] Ensuring demo data before test run...');
+      await ensureDemoData();
+
       const results: QATestResult[] = [];
       const previouslyPassed = QALocalStorage.getPassedTestIds();
 
@@ -187,6 +204,9 @@ export class QATestRunner {
         summary: `${summary.passed}/${summary.totalTests} passed`
       };
       QALocalStorage.addRunHistory(historyEntry);
+
+      // ====== ALWAYS RETURN TO /QA ======
+      await ensureReturnToQA();
 
       return summary;
     } finally {
@@ -352,9 +372,14 @@ export class QATestRunner {
     return await runSanityV2({ fix });
   }
 
-  // Feature Test Runner Integration
+  // Feature Test Runner Integration with auto-seeding
   async runAllFeatureTests(): Promise<FeatureTestSummary> {
-    return await featureTestRunner.runAllTests();
+    // Ensure demo data before feature tests
+    await ensureDemoData();
+    const result = await featureTestRunner.runAllTests();
+    // Always return to /qa after feature tests
+    await ensureReturnToQA();
+    return result;
   }
 
   async runSingleFeatureTest(testId: string): Promise<FeatureTestResult> {
@@ -363,7 +388,7 @@ export class QATestRunner {
 
   getFeatureTestResults(): FeatureTestResult[] {
     const summary = featureTestRunner.getLastResults();
-    return summary?.results || [];
+    return summary?.results ?? [];
   }
 }
 

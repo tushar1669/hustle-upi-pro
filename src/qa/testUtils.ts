@@ -8,9 +8,52 @@ export interface TestResult {
   timeMs: number;
 }
 
-// Centralized selector building for test-ids
+// ====== CENTRALIZED SELECTOR SYSTEM (A) ======
+// CSS.escape() based selector building for bulletproof safety
+export function sel(id: string): string {
+  return `[data-testid=${CSS.escape(id)}]`;
+}
+
+// Thin wrapper functions that only accept test IDs (no raw CSS)
+export function q(id: string): Element | null {
+  return document.querySelector(sel(id));
+}
+
+export function qa(id: string): NodeListOf<Element> {
+  return document.querySelectorAll(sel(id));
+}
+
+export function exists(id: string): boolean {
+  return q(id) !== null;
+}
+
+export function visible(id: string): boolean {
+  const element = q(id) as HTMLElement;
+  if (!element) return false;
+  
+  const style = window.getComputedStyle(element);
+  return style.display !== 'none' && 
+         style.visibility !== 'hidden' && 
+         element.offsetWidth > 0 && 
+         element.offsetHeight > 0;
+}
+
+export function click(id: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const element = q(id) as HTMLElement;
+    if (element) {
+      element.click();
+      setTimeout(() => resolve(true), 50);
+    } else {
+      resolve(false);
+    }
+  });
+}
+
+// ====== LEGACY COMPATIBILITY ======
+// Keep byTestId for existing code that hasn't been migrated yet
 export function byTestId(id: string): string {
-  return `[data-testid="${id}"]`;
+  return sel(id);
 }
 
 // Navigation helper
@@ -23,7 +66,8 @@ export function goto(path: string): Promise<void> {
   });
 }
 
-// Click element by data-testid using selector helper
+// ====== LEGACY HELPERS (for backwards compatibility) ======
+// These use the new safe selector system internally
 export function clickTestIdBySelector(selector: string): Promise<boolean> {
   return new Promise((resolve) => {
     const element = document.querySelector(selector) as HTMLElement;
@@ -36,29 +80,30 @@ export function clickTestIdBySelector(selector: string): Promise<boolean> {
   });
 }
 
-// Click element by data-testid (using centralized helper)
+// Legacy function - use click(id) instead
 export function clickTestId(testId: string): Promise<boolean> {
-  return clickTestIdBySelector(byTestId(testId));
+  return click(testId);
 }
 
-// Query all elements by data-testid (using centralized helper)
+// Legacy function - use qa(id) instead
 export function queryAllTestId(testId: string): NodeListOf<Element> {
-  return document.querySelectorAll(byTestId(testId));
+  return qa(testId);
 }
 
-// Query single element by data-testid (using centralized helper)
+// Legacy function - use q(id) instead  
 export function queryTestId(testId: string): Element | null {
-  return document.querySelector(byTestId(testId));
+  return q(testId);
 }
 
-// Test-id specific helpers
-export function waitForTestId(testId: string, timeout: number = 2000): Promise<boolean> {
-  return waitFor(byTestId(testId), timeout);
+// ====== BULLETPROOF WAITING (B) ======
+// waitForId with built-in CSS.escape safety
+export function waitForId(id: string, timeout: number = 2000): Promise<boolean> {
+  return waitFor(() => exists(id), timeout);
 }
 
-// Wait for condition or selector
+// Bulletproof waitFor with try/catch wrapping 
 export function waitFor(
-  condition: string | (() => boolean), 
+  condition: (() => boolean), 
   timeout: number = 2000
 ): Promise<boolean> {
   return new Promise((resolve) => {
@@ -67,16 +112,11 @@ export function waitFor(
     const check = () => {
       let conditionMet = false;
       
-      if (typeof condition === 'string') {
-        // Selector string
-        conditionMet = document.querySelector(condition) !== null;
-      } else {
-        // Function
-        try {
-          conditionMet = condition();
-        } catch {
-          conditionMet = false;
-        }
+      try {
+        conditionMet = condition();
+      } catch (error) {
+        console.warn('[QA] waitFor condition threw error:', error);
+        conditionMet = false;
       }
       
       if (conditionMet) {
@@ -92,14 +132,20 @@ export function waitFor(
   });
 }
 
+// Legacy compatibility
+export function waitForTestId(testId: string, timeout: number = 2000): Promise<boolean> {
+  return waitForId(testId, timeout);
+}
+
 // Helper to create notes
 export function note(message: string): string {
   return message;
 }
 
-// Enhanced navigation helper with wait (using centralized helper)
-export function gotoAndWait(path: string, testId: string, timeout: number = 8000): Promise<boolean> {
-  return goto(path).then(() => waitForTestId(testId, timeout));
+// ====== NAVIGATION & TEST LIFECYCLE (C) ======
+// Enhanced navigation with renamed parameter to avoid shadowing
+export function gotoAndWait(path: string, anchorTestId: string, timeout: number = 8000): Promise<boolean> {
+  return goto(path).then(() => waitForId(anchorTestId, timeout));
 }
 
 // Ensure return to QA page after test (using centralized helper)
@@ -120,23 +166,15 @@ export async function runWithQaReturn<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-// Enhanced window.open stubbing that redirects to current window
+// ====== ENHANCED WINDOW.OPEN STUBBING ======
 export let originalWindowOpen: ((url?: string | URL | undefined, target?: string | undefined, features?: string | undefined) => Window | null) | null = null;
 
 export function stubWindowOpen(): void {
   if (!originalWindowOpen) {
     originalWindowOpen = window.open;
+    // NOOP implementation - log only, never redirect
     window.open = (url?: string | URL | undefined) => {
-      console.debug('[QA] stubbed window.open, redirecting to current window', url);
-      if (url && typeof url === 'string') {
-        // For external URLs, redirect in current window
-        if (url.startsWith('http') || url.startsWith('upi://')) {
-          console.debug('[QA] external URL detected, stubbing as no-op');
-          return null;
-        }
-        // For internal URLs, navigate in current window
-        window.location.href = url;
-      }
+      console.debug('[QA] window.open stubbed - NOOP:', url);
       return null;
     };
   }
@@ -209,14 +247,13 @@ export function fillInput(selector: string, value: string): boolean {
   return false;
 }
 
-// Check if element exists and is clickable (using centralized helper)
+// Check if element exists and is clickable
 export function isClickable(testId: string): boolean {
-  const selector = byTestId(testId);
-  const element = document.querySelector(selector) as HTMLElement;
+  const element = q(testId) as HTMLElement;
   if (!element) return false;
   
   const style = window.getComputedStyle(element);
   return style.pointerEvents !== 'none' && 
          !element.hasAttribute('disabled') &&
-         isVisible(selector);
+         visible(testId);
 }

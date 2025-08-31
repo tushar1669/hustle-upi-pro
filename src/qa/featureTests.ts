@@ -330,7 +330,7 @@ export class FeatureTestRunner {
         
         // Test add client
         await clickTestId('btn-add-client');
-        await waitFor('input[name="name"]', 2000);
+        await waitFor(() => document.querySelector('input[name="name"]') !== null, 2000);
         
         if (!fillInput('input[name="name"]', `Test Client ${Date.now()}`)) {
           throw new Error('Could not fill client name input');
@@ -350,7 +350,7 @@ export class FeatureTestRunner {
         const editButtons = queryAllTestId('btn-client-edit');
         if (editButtons.length > 0) {
           (editButtons[0] as HTMLElement).click();
-          await waitFor('.modal, [role="dialog"]', 2000);
+          await waitFor(() => document.querySelector('.modal, [role="dialog"]') !== null, 2000);
         }
 
         return {
@@ -487,7 +487,7 @@ export class FeatureTestRunner {
         }
 
         (editBtn as HTMLElement).click();
-        await waitFor('input[name="title"]', 2000);
+        await waitFor(() => document.querySelector('input[name="title"]') !== null, 2000);
 
         const titleInput = document.querySelector('input[name="title"]') as HTMLInputElement;
         if (titleInput) {
