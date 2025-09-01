@@ -9,6 +9,14 @@ export interface TestResult {
 }
 
 // ====== CENTRALIZED SELECTOR SYSTEM (A) ======
+// CSS.escape() polyfill for older browsers  
+if (!window.CSS || !window.CSS.escape) {
+  (window as any).CSS = window.CSS || {};
+  (window as any).CSS.escape = function(value: string): string {
+    return value.replace(/([!"#$%&'()*+,\-./:;<=>?@[\\\]^`{|}~])/g, '\\$1');
+  };
+}
+
 // CSS.escape() based selector building for bulletproof safety
 export function sel(id: string): string {
   return `[data-testid=${CSS.escape(id)}]`;
@@ -177,6 +185,13 @@ export function stubWindowOpen(): void {
       console.debug('[QA] window.open stubbed - NOOP:', url);
       return null;
     };
+  }
+}
+
+// Non-destructive mode: Guard network calls during QA
+declare global {
+  interface Window {
+    __QA__?: boolean;
   }
 }
 
