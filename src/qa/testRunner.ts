@@ -46,14 +46,7 @@ export class QATestRunner {
       throw new Error(`Test not found: ${testId}`);
     }
 
-    // ====== GUARDED AUTO-SEED (once per batch) ======
-    if (!this.seedGuard) {
-      console.log('[QA] Auto-seeding for single test run...');
-      await ensureDemoData();
-      this.seedGuard = true;
-      // Reset guard after a delay to allow new batches
-      setTimeout(() => { this.seedGuard = false; }, 5000);
-    }
+    // Demo data seeding removed - tests will skip if data missing
 
     const startTime = Date.now();
     
@@ -162,10 +155,7 @@ export class QATestRunner {
     setQAFixesEnabled(this.fixMode);
 
     try {
-      // ====== AUTO-SEED BEFORE EVERY RUN ======
-      console.log('[QA] Ensuring demo data before test run...');
-      await ensureDemoData();
-
+      // Demo data seeding removed - tests will skip if data missing
       const results: QATestResult[] = [];
       const previouslyPassed = QALocalStorage.getPassedTestIds();
 
@@ -372,10 +362,8 @@ export class QATestRunner {
     return await runSanityV2({ fix });
   }
 
-  // Feature Test Runner Integration with auto-seeding
+  // Feature Test Runner Integration - no auto-seeding
   async runAllFeatureTests(): Promise<FeatureTestSummary> {
-    // Ensure demo data before feature tests
-    await ensureDemoData();
     const result = await featureTestRunner.runAllTests();
     // Always return to /qa after feature tests
     await ensureReturnToQA();

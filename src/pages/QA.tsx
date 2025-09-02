@@ -196,6 +196,16 @@ export default function QA() {
   };
 
   const handleExportReport = () => {
+    // Check if we have valid feature test results
+    if (!featureTestSummary || !featureTestSummary.results) {
+      toast({
+        title: 'Export Warning',
+        description: 'No valid feature test results found. Run feature tests first.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     const exportData = {
       executedAt: new Date().toISOString(),
       featureTests: featureTestSummary,
@@ -324,22 +334,27 @@ export default function QA() {
         <CardContent>
           <div className="grid grid-cols-4 gap-4 text-center">
             <div>
-              <div className="text-2xl font-bold">{demoDataCounts.clients}</div>
+              <div className="text-2xl font-bold">{demoDataCounts.clients || '—'}</div>
               <div className="text-sm text-muted-foreground">Clients</div>
             </div>
             <div>
-              <div className="text-2xl font-bold">{demoDataCounts.invoices}</div>
+              <div className="text-2xl font-bold">{demoDataCounts.invoices || '—'}</div>
               <div className="text-sm text-muted-foreground">Invoices</div>
             </div>
             <div>
-              <div className="text-2xl font-bold">{demoDataCounts.tasks}</div>
+              <div className="text-2xl font-bold">{demoDataCounts.tasks || '—'}</div>
               <div className="text-sm text-muted-foreground">Tasks</div>
             </div>
             <div>
-              <div className="text-2xl font-bold">{demoDataCounts.reminders}</div>
+              <div className="text-2xl font-bold">{demoDataCounts.reminders || '—'}</div>
               <div className="text-sm text-muted-foreground">Reminders</div>
             </div>
           </div>
+          {(demoDataCounts.clients === 0 && demoDataCounts.invoices === 0 && demoDataCounts.tasks === 0) && (
+            <div className="mt-4 text-sm text-muted-foreground text-center">
+              Demo data is optional; some tests may be skipped.
+            </div>
+          )}
         </CardContent>
       </Card>
 
