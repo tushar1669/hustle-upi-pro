@@ -310,7 +310,7 @@ export default function QA() {
       <div className="text-sm text-muted-foreground space-y-1">
         {lastPopulateTime && <div>Last populate: {lastPopulateTime}</div>}
         {lastResetTime && <div>Last reset: {lastResetTime}</div>}
-        {featureTestSummary && <div>Last test run: {new Date(featureTestSummary.runTime).toLocaleString()}</div>}
+        {featureTestSummary && <div>Last test run: {new Date(featureTestSummary.timestamp).toLocaleString()}</div>}
       </div>
 
       {/* Demo Data Counts */}

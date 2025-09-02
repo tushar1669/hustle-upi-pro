@@ -54,7 +54,7 @@ export const FEATURE_TESTS = [
     name: 'Dashboard Quick Actions',
     description: 'Validates quick action buttons on dashboard',
     run: async (): Promise<FeatureTestResult> => {
-      return runWithQaReturn(async () => {
+        return runWithQaReturn(async () => {
         const success = await gotoAndWait('/', 'qa-btn-new-invoice');
         if (!success) {
           return { id: 'DASHBOARD_QUICK_ACTIONS', name: 'Dashboard Quick Actions', status: 'failed', notes: 'Dashboard did not load or quick actions missing', duration: 0 };
@@ -67,7 +67,9 @@ export const FEATURE_TESTS = [
 
         if (!newInvoiceBtn || !addTaskBtn || !addClientBtn) {
           return { 
-            status: 'fail', 
+            id: 'DASHBOARD_QUICK_ACTIONS',
+            name: 'Dashboard Quick Actions',
+            status: 'failed', 
             notes: `Missing quick actions: ${!newInvoiceBtn ? 'invoice ' : ''}${!addTaskBtn ? 'task ' : ''}${!addClientBtn ? 'client' : ''}`, 
             duration: 0 
           };
@@ -89,21 +91,21 @@ export const FEATURE_TESTS = [
       return runWithQaReturn(async () => {
         const success = await gotoAndWait('/clients', 'btn-add-client');
         if (!success) {
-          return { status: 'fail', notes: 'Clients page did not load', duration: 0 };
+          return { id: 'CLIENTS_ADD_AND_EDIT', name: 'Clients Add and Edit', status: 'failed', notes: 'Clients page did not load', duration: 0 };
         }
 
         const clientRows = qa('client-row');
         const addButton = q('btn-add-client');
         
         if (!addButton) {
-          return { status: 'fail', notes: 'Add client button not found', duration: 0 };
+          return { id: 'CLIENTS_ADD_AND_EDIT', name: 'Clients Add and Edit', status: 'failed', notes: 'Add client button not found', duration: 0 };
         }
 
         // Test button interaction (non-destructive)
         await click('btn-add-client');
         await waitForId('btn-client-add-submit', 1000);
 
-        return { status: 'pass', notes: `Found ${clientRows.length} client(s), add functionality works`, duration: 0 };
+        return { id: 'CLIENTS_ADD_AND_EDIT', name: 'Clients Add and Edit', status: 'passed', notes: `Found ${clientRows.length} client(s), add functionality works`, duration: 0 };
       });
     }
   },
@@ -115,12 +117,12 @@ export const FEATURE_TESTS = [
       return runWithQaReturn(async () => {
         const success = await gotoAndWait('/tasks', 'task-card');
         if (!success) {
-          return { status: 'fail', notes: 'Tasks page did not load or no tasks available', duration: 0 };
+          return { id: 'TASKS_MARK_DONE_PERSISTS', name: 'Tasks Mark Done Persistence', status: 'failed', notes: 'Tasks page did not load or no tasks available', duration: 0 };
         }
 
         const taskCards = qa('task-card');
         if (taskCards.length === 0) {
-          return { status: 'fail', notes: 'No tasks found - demo data should guarantee tasks', duration: 0 };
+          return { id: 'TASKS_MARK_DONE_PERSISTS', name: 'Tasks Mark Done Persistence', status: 'failed', notes: 'No tasks found - demo data should guarantee tasks', duration: 0 };
         }
 
         // Check for task action buttons
@@ -140,7 +142,9 @@ export const FEATURE_TESTS = [
         }
 
         return { 
-          status: 'pass', 
+          id: 'TASKS_MARK_DONE_PERSISTS',
+          name: 'Tasks Mark Done Persistence',
+          status: 'passed', 
           notes: `Found ${taskCards.length} task(s), ${markDoneBtn ? 'mark-done ' : ''}${editBtn ? 'edit ' : ''}actions available`, 
           duration: 0 
         };
@@ -155,12 +159,12 @@ export const FEATURE_TESTS = [
       return runWithQaReturn(async () => {
         const success = await gotoAndWait('/invoices', 'invoice-menu-trigger');
         if (!success) {
-          return { status: 'fail', notes: 'Invoices page did not load', duration: 0 };
+          return { id: 'INVOICES_SEARCH_PREVIEW_EDIT_SEND', name: 'Invoice Search Preview Edit Send', status: 'failed', notes: 'Invoices page did not load', duration: 0 };
         }
 
         const menuTrigger = q('invoice-menu-trigger');
         if (!menuTrigger) {
-          return { status: 'fail', notes: 'Invoice menu trigger not found', duration: 0 };
+          return { id: 'INVOICES_SEARCH_PREVIEW_EDIT_SEND', name: 'Invoice Search Preview Edit Send', status: 'failed', notes: 'Invoice menu trigger not found', duration: 0 };
         }
 
         // Test menu interaction
@@ -173,7 +177,7 @@ export const FEATURE_TESTS = [
           await waitForId('invoice-preview-modal', 1000);
         }
 
-        return { status: 'pass', notes: 'Invoice list and menu functionality working', duration: 0 };
+        return { id: 'INVOICES_SEARCH_PREVIEW_EDIT_SEND', name: 'Invoice Search Preview Edit Send', status: 'passed', notes: 'Invoice list and menu functionality working', duration: 0 };
       });
     }
   },
@@ -185,7 +189,7 @@ export const FEATURE_TESTS = [
       return runWithQaReturn(async () => {
         const success = await gotoAndWait('/invoices/new', 'invoice-preview-card');
         if (!success) {
-          return { status: 'fail', notes: 'New invoice page did not load', duration: 0 };
+          return { id: 'INVOICE_CREATE_SAVE_CONTROLS', name: 'Invoice Create Save Controls', status: 'failed', notes: 'New invoice page did not load', duration: 0 };
         }
 
         // Check for form elements and preview
@@ -195,14 +199,16 @@ export const FEATURE_TESTS = [
         const addLineBtn = q('btn-add-line-item');
 
         if (!previewCard) {
-          return { status: 'fail', notes: 'Invoice preview card not found', duration: 0 };
+          return { id: 'INVOICE_CREATE_SAVE_CONTROLS', name: 'Invoice Create Save Controls', status: 'failed', notes: 'Invoice preview card not found', duration: 0 };
         }
 
         // Test button presence and functionality (all are disabled/demo buttons)
         const buttonsFound = [saveDraftBtn, saveSendBtn, addLineBtn].filter(Boolean).length;
 
         return { 
-          status: 'pass', 
+          id: 'INVOICE_CREATE_SAVE_CONTROLS',
+          name: 'Invoice Create Save Controls',
+          status: 'passed', 
           notes: `New invoice page loaded with preview, ${buttonsFound}/3 action buttons found`, 
           duration: 0 
         };
@@ -217,13 +223,13 @@ export const FEATURE_TESTS = [
       return runWithQaReturn(async () => {
         const success = await gotoAndWait('/follow-ups', 'btn-open-reminder-preview');
         if (!success) {
-          return { status: 'fail', notes: 'Follow-ups page did not load', duration: 0 };
+          return { id: 'FOLLOWUPS_PREVIEW_CONFIRM_SEND', name: 'Follow-ups Preview and Send', status: 'failed', notes: 'Follow-ups page did not load', duration: 0 };
         }
 
         // Look for reminder preview button
         const previewBtn = q('btn-open-reminder-preview');
         if (!previewBtn) {
-          return { status: 'fail', notes: 'Reminder preview button not found', duration: 0 };
+          return { id: 'FOLLOWUPS_PREVIEW_CONFIRM_SEND', name: 'Follow-ups Preview and Send', status: 'failed', notes: 'Reminder preview button not found', duration: 0 };
         }
 
         // Test opening preview drawer (non-destructive)
@@ -235,7 +241,7 @@ export const FEATURE_TESTS = [
         const confirmBtn = q('btn-confirm-send');
 
         if (!msgInput || !confirmBtn) {
-          return { status: 'fail', notes: 'Follow-up drawer elements missing', duration: 0 };
+          return { id: 'FOLLOWUPS_PREVIEW_CONFIRM_SEND', name: 'Follow-ups Preview and Send', status: 'failed', notes: 'Follow-up drawer elements missing', duration: 0 };
         }
 
         // Test input interaction (non-destructive)
@@ -244,7 +250,7 @@ export const FEATURE_TESTS = [
           msgInput.dispatchEvent(new Event('input', { bubbles: true }));
         }
 
-        return { status: 'pass', notes: 'Follow-ups workflow functional with input testing', duration: 0 };
+        return { id: 'FOLLOWUPS_PREVIEW_CONFIRM_SEND', name: 'Follow-ups Preview and Send', status: 'passed', notes: 'Follow-ups workflow functional with input testing', duration: 0 };
       });
     }
   },
@@ -256,7 +262,7 @@ export const FEATURE_TESTS = [
       return runWithQaReturn(async () => {
         const success = await gotoAndWait('/savings', 'sg-total-target');
         if (!success) {
-          return { status: 'fail', notes: 'Savings page did not load', duration: 0 };
+          return { id: 'SAVINGS_CRUD_AND_METRICS', name: 'Savings CRUD and Metrics', status: 'failed', notes: 'Savings page did not load', duration: 0 };
         }
 
         // Check for savings metrics
@@ -265,7 +271,7 @@ export const FEATURE_TESTS = [
         const totalProgress = q('sg-total-progress');
 
         if (!totalTarget || !totalSaved || !totalProgress) {
-          return { status: 'fail', notes: 'Savings metrics elements missing', duration: 0 };
+          return { id: 'SAVINGS_CRUD_AND_METRICS', name: 'Savings CRUD and Metrics', status: 'failed', notes: 'Savings metrics elements missing', duration: 0 };
         }
 
         // Verify metrics have non-zero values (demo data should guarantee this)
@@ -275,7 +281,9 @@ export const FEATURE_TESTS = [
         const hasNonZeroValues = targetText.includes('₹') && savedText.includes('₹');
 
         return { 
-          status: 'pass', 
+          id: 'SAVINGS_CRUD_AND_METRICS',
+          name: 'Savings CRUD and Metrics',
+          status: 'passed', 
           notes: `Savings goals page loaded with metrics${hasNonZeroValues ? ' (non-zero values)' : ''}`, 
           duration: 0 
         };
@@ -290,7 +298,7 @@ export const FEATURE_TESTS = [
       return runWithQaReturn(async () => {
         const success = await gotoAndWait('/settings', 'settings-form');
         if (!success) {
-          return { status: 'fail', notes: 'Settings page did not load', duration: 0 };
+          return { id: 'SETTINGS_FIELDS_PRESENT', name: 'Settings Fields Present', status: 'failed', notes: 'Settings page did not load', duration: 0 };
         }
 
         // Check for key form fields using name attributes (as specified)
@@ -299,7 +307,7 @@ export const FEATURE_TESTS = [
         const prefixInput = document.querySelector('input[name="invoice_prefix"]');
 
         if (!upiInput || !nameInput || !prefixInput) {
-          return { status: 'fail', notes: 'Settings form fields missing', duration: 0 };
+          return { id: 'SETTINGS_FIELDS_PRESENT', name: 'Settings Fields Present', status: 'failed', notes: 'Settings form fields missing', duration: 0 };
         }
 
         // Verify fields have expected values from demo data
@@ -310,7 +318,9 @@ export const FEATURE_TESTS = [
         const hasQAValues = upiValue.includes('qa-tester') && nameValue.includes('QA Tester') && prefixValue === 'QA';
 
         return { 
-          status: 'pass', 
+          id: 'SETTINGS_FIELDS_PRESENT',
+          name: 'Settings Fields Present',
+          status: 'passed', 
           notes: `Settings page loaded with all form fields${hasQAValues ? ' (QA values set)' : ''}`, 
           duration: 0 
         };
@@ -334,17 +344,17 @@ export const FEATURE_TESTS = [
         for (const route of routes) {
           const success = await gotoAndWait(route.path, route.anchor);
           if (!success) {
-            return { status: 'fail', notes: `Failed to navigate to ${route.path}`, duration: 0 };
+            return { id: 'NAV_SIDEBAR_ACTIVE', name: 'Navigation Sidebar Active States', status: 'failed', notes: `Failed to navigate to ${route.path}`, duration: 0 };
           }
 
           // Check if navigation item is active
           const navItem = q(route.nav);
           if (!navItem) {
-            return { status: 'fail', notes: `Navigation item ${route.nav} not found`, duration: 0 };
+            return { id: 'NAV_SIDEBAR_ACTIVE', name: 'Navigation Sidebar Active States', status: 'failed', notes: `Navigation item ${route.nav} not found`, duration: 0 };
           }
         }
 
-        return { status: 'pass', notes: 'All navigation routes working with proper anchor elements', duration: 0 };
+        return { id: 'NAV_SIDEBAR_ACTIVE', name: 'Navigation Sidebar Active States', status: 'passed', notes: 'All navigation routes working with proper anchor elements', duration: 0 };
       });
     }
   },
@@ -356,12 +366,12 @@ export const FEATURE_TESTS = [
       return runWithQaReturn(async () => {
         const success = await gotoAndWait('/tasks', 'task-card');
         if (!success) {
-          return { status: 'fail', notes: 'Tasks page did not load', duration: 0 };
+          return { id: 'TASKS_EDIT_MODAL_UPDATES', name: 'Task Edit Modal Updates', status: 'failed', notes: 'Tasks page did not load', duration: 0 };
         }
 
         const editBtn = q('task-edit-open');
         if (!editBtn) {
-          return { status: 'skip', notes: 'No edit button found - may be feature specific', duration: 0 };
+          return { id: 'TASKS_EDIT_MODAL_UPDATES', name: 'Task Edit Modal Updates', status: 'skipped', notes: 'No edit button found - may be feature specific', duration: 0 };
         }
 
         // Test edit modal
@@ -369,10 +379,10 @@ export const FEATURE_TESTS = [
         const saveBtn = await waitForId('task-edit-save', 1000);
         
         if (!saveBtn) {
-          return { status: 'fail', notes: 'Edit modal did not open or save button missing', duration: 0 };
+          return { id: 'TASKS_EDIT_MODAL_UPDATES', name: 'Task Edit Modal Updates', status: 'failed', notes: 'Edit modal did not open or save button missing', duration: 0 };
         }
 
-        return { status: 'pass', notes: 'Task edit modal opens and shows save button', duration: 0 };
+        return { id: 'TASKS_EDIT_MODAL_UPDATES', name: 'Task Edit Modal Updates', status: 'passed', notes: 'Task edit modal opens and shows save button', duration: 0 };
       });
     }
   },
@@ -384,7 +394,7 @@ export const FEATURE_TESTS = [
       return runWithQaReturn(async () => {
         const success = await gotoAndWait('/tasks', 'task-card');
         if (!success) {
-          return { status: 'fail', notes: 'Tasks page did not load', duration: 0 };
+          return { id: 'TASKS_KANBAN_DRAG_PERSISTS', name: 'Kanban Drag Persistence', status: 'failed', notes: 'Tasks page did not load', duration: 0 };
         }
 
         // Check for kanban columns
@@ -392,10 +402,10 @@ export const FEATURE_TESTS = [
         const doneCol = q('kanban-col-done');
 
         if (!openCol || !doneCol) {
-          return { status: 'skip', notes: 'Kanban view not available or columns missing', duration: 0 };
+          return { id: 'TASKS_KANBAN_DRAG_PERSISTS', name: 'Kanban Drag Persistence', status: 'skipped', notes: 'Kanban view not available or columns missing', duration: 0 };
         }
 
-        return { status: 'pass', notes: 'Kanban columns found and accessible', duration: 0 };
+        return { id: 'TASKS_KANBAN_DRAG_PERSISTS', name: 'Kanban Drag Persistence', status: 'passed', notes: 'Kanban columns found and accessible', duration: 0 };
       });
     }
   }
