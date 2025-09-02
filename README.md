@@ -1,85 +1,110 @@
-# Welcome to your Lovable project
+# HustleHub — UPI Business Management Platform
 
-## Project info
+A React-based business management platform for Indian freelancers and small businesses, featuring invoice creation, UPI payment integration, and automated follow-up systems.
+
+## 🚀 Live Demo
 
 **URL**: https://lovable.dev/projects/05aade8b-e990-49d1-b9be-8cd413ddd42e
 
-## How can I edit this code?
+## ✨ Key Features
 
-There are several ways of editing your application.
+- **Invoice Management**: Create, edit, and track invoices with PDF generation
+- **UPI Payment Integration**: Generate UPI deeplinks and QR codes for instant payments  
+- **Client Management**: Complete client database with contact information
+- **Follow-up Automation**: WhatsApp and email reminder scheduling
+- **Task Tracking**: Billable task management with invoice linking
+- **Dashboard Analytics**: Real-time metrics and payment tracking
+- **QA Testing Suite**: Built-in testing framework for reliability
+- **Mobile-First Design**: Responsive UI optimized for Indian users
 
-**Use Lovable**
+## 🛠 Tech Stack
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/05aade8b-e990-49d1-b9be-8cd413ddd42e) and start prompting.
+- **Frontend**: React 18 + TypeScript + Vite
+- **UI**: Tailwind CSS + shadcn/ui components
+- **Backend**: Supabase (PostgreSQL + Auth + RLS)
+- **Payments**: UPI protocol integration
+- **State**: Zustand + TanStack Query
+- **PDF**: jsPDF + html2canvas
+- **QR Codes**: qrcode.react library
 
-Changes made via Lovable will be committed automatically to this repo.
+## ⚡ Quick Start
 
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
+```bash
+# Clone repository
 git clone <YOUR_GIT_URL>
+cd hustlehub
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Install dependencies
+npm install
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Set up environment
+cp .env.example .env
+# Add your Supabase credentials
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## 📁 Project Structure
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```
+src/
+├── components/          # Reusable UI components
+│   ├── auth/           # Authentication components
+│   ├── ui/             # shadcn/ui component library
+│   ├── layout/         # Layout components (header, sidebar)
+│   └── celebrations/   # Success animations
+├── pages/              # Route components
+│   ├── auth/          # Sign in/up pages
+│   └── invoices/      # Invoice management pages
+├── lib/               # Utilities and helpers
+├── services/          # Business logic (payments, PDF)
+├── qa/                # Testing framework
+├── data/              # Supabase data layer
+└── hooks/             # Custom React hooks
+```
 
-**Use GitHub Codespaces**
+## 🔧 Environment Setup
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Copy `.env.example` to `.env` and configure:
 
-## What technologies are used for this project?
+```bash
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
 
-This project is built with:
+## 📖 Documentation
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- [**Status & Roadmap**](docs/STATUS.md) — Current feature status and development plan
+- [**Architecture**](docs/ARCHITECTURE.md) — System design and component structure  
+- [**Data Model**](docs/DATA_MODEL.md) — Database schema and relationships
+- [**User Flows**](docs/FLOWS.md) — Key user journeys and workflows
+- [**Setup Guide**](docs/SETUP.md) — Detailed development setup instructions
 
-## How can I deploy this project?
+## 🤝 Contributing
 
-Simply open [Lovable](https://lovable.dev/projects/05aade8b-e990-49d1-b9be-8cd413ddd42e) and click on Share -> Publish.
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## Can I connect a custom domain to my Lovable project?
+## 🚀 Deployment
 
-Yes, you can!
+Deploy instantly via Lovable:
+1. Open [Lovable Project](https://lovable.dev/projects/05aade8b-e990-49d1-b9be-8cd413ddd42e)
+2. Click **Share → Publish**
+3. Optional: Connect custom domain in Project → Settings → Domains
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## 📄 License
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+This project is built with [Lovable](https://lovable.dev) — AI-powered React development platform.
 
-## Security Posture (Phase-1)
+## 🔒 Security (Current Phase)
 
-Current security measures implemented:
-- **Data minimization**: Sensitive columns (emails, phone numbers, UPI) excluded from list endpoints
-- **Detail fetching**: Full sensitive data only loaded when specifically accessing individual records
-- **Masking helpers**: Available for UI previews of sensitive data when needed
-- **Supabase Auth safeguards**: Leaked password protection enabled, 5-minute OTP expiry
-- **No RLS yet**: Operating in single-user/demo mode for MVP phase
+- **Single-user architecture**: MVP designed for individual users
+- **Data minimization**: Sensitive data excluded from list endpoints
+- **Supabase Auth**: Built-in security with email verification
+- **Phase 2 planned**: Multi-user with Row Level Security (RLS)
 
-Phase 2 will implement Row Level Security (RLS) with proper user authentication.
-See `/supabase/policies/phase2_rls_draft.sql` for planned security policies.
+See `supabase/policies/phase2_rls_draft.sql` for planned security enhancements.
