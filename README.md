@@ -11,7 +11,7 @@ A React-based business management platform for Indian freelancers and small busi
 - **Invoice Management**: Create, edit, and track invoices with PDF generation
 - **UPI Payment Integration**: Generate UPI deeplinks and QR codes for instant payments  
 - **Client Management**: Complete client database with contact information
-- **Follow-up Automation**: WhatsApp and email reminder scheduling
+- **Follow-up Automation**: WhatsApp share (manual); Email reminders (planned)
 - **Task Tracking**: Billable task management with invoice linking
 - **Dashboard Analytics**: Real-time metrics and payment tracking
 - **QA Testing Suite**: Built-in testing framework for reliability
