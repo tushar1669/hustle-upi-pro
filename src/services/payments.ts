@@ -32,7 +32,55 @@ export function sanitizePhone(phone: string): string {
 }
 
 /**
- * Build a UPI payment intent URL
+ * Sanitize phone number specifically for WhatsApp wa.me links
+ * Converts various Indian phone formats to 91XXXXXXXXXX format
+ * @param phone - The input phone number string
+ * @returns Phone number in wa.me format (91XXXXXXXXXX) or empty string if invalid
+ */
+export function sanitizePhoneForWhatsApp(phone: string): string {
+  if (!phone) return "";
+  
+  // Remove all non-digits
+  const digits = phone.replace(/\D/g, "");
+  
+  // Handle various Indian phone number formats
+  if (digits.length === 10 && digits.match(/^[6-9]/)) {
+    // 10-digit Indian mobile starting with 6-9
+    return "91" + digits;
+  } else if (digits.length === 12 && digits.startsWith("91") && digits.substring(2).match(/^[6-9]/)) {
+    // 12-digit with 91 prefix
+    return digits;
+  } else if (digits.length === 13 && digits.startsWith("091")) {
+    // 13-digit with 091 prefix, convert to 91
+    return "91" + digits.substring(3);
+  }
+  
+  return ""; // Invalid format
+}
+
+/**
+ * Validate if a phone number is a valid Indian mobile number
+ * @param phone - The input phone number string
+ * @returns Object with validation result and error message
+ */
+export function validateIndianMobile(phone: string): { valid: boolean; error?: string } {
+  if (!phone.trim()) {
+    return { valid: true }; // Allow empty (optional field)
+  }
+  
+  const sanitized = sanitizePhoneForWhatsApp(phone);
+  if (!sanitized) {
+    return { 
+      valid: false, 
+      error: "Please enter a valid Indian mobile number (10 digits starting with 6-9)" 
+    };
+  }
+  
+  return { valid: true };
+}
+
+/**
+ * Build a UPI payment intent URL with proper encoding
  * @param params - UPI payment parameters
  * @returns UPI deeplink string
  */
@@ -43,11 +91,14 @@ export function buildUpiIntent(params: {
   tn?: string;
 }): string {
   const queryParams = new URLSearchParams();
+  
+  // Ensure all parameters are properly encoded
   queryParams.set("pa", params.pa);
   queryParams.set("pn", params.pn);
   queryParams.set("am", String(params.am));
   
   if (params.tn) {
+    // Format transaction note as INVHH-<invoice_number> (no spaces)
     queryParams.set("tn", params.tn);
   }
   
@@ -63,7 +114,10 @@ export function buildWhatsAppUrl(params: {
   phone: string;
   text: string;
 }): string {
-  const sanitizedPhone = sanitizePhone(params.phone);
+  const sanitizedPhone = sanitizePhoneForWhatsApp(params.phone);
+  if (!sanitizedPhone) {
+    throw new Error("Invalid phone number for WhatsApp");
+  }
   const encodedText = encodeURIComponent(params.text);
   return `https://wa.me/${sanitizedPhone}?text=${encodedText}`;
 }
@@ -153,7 +207,7 @@ export function buildInvoiceReminderText(input: {
     pa: input.upiVpa,
     pn: input.businessName,
     am: input.amountINR,
-    tn: `INV ${input.invoiceNumber}`,
+    tn: `INVHH-${input.invoiceNumber}`,
   });
   
   const message = `Hi ${input.clientName},\n\nJust a reminder for Invoice ${input.invoiceNumber} — ${formatINR(input.amountINR)} (${dueString}).\n\nPay via UPI:\n${upiIntent}\n\nThank you!`;

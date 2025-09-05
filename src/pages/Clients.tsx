@@ -12,6 +12,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { clients_all, create_client } from "@/data/collections";
 import { useToast } from "@/hooks/use-toast";
 import ClientEditModal from "@/components/ClientEditModal";
+import { validateIndianMobile } from "@/services/payments";
 
 export default function Clients() {
   const { data: clients = [], refetch } = useQuery({ queryKey: ["clients_all"], queryFn: clients_all });
@@ -25,6 +26,7 @@ export default function Clients() {
     gstin: "",
     upi_vpa: ""
   });
+  const [phoneError, setPhoneError] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const location = useLocation();
@@ -38,15 +40,35 @@ export default function Clients() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate phone number
+    const phoneValidation = validateIndianMobile(formData.whatsapp);
+    if (!phoneValidation.valid) {
+      setPhoneError(phoneValidation.error || "Invalid phone number");
+      return;
+    }
+    
     try {
       await create_client(formData);
       await refetch();
       queryClient.invalidateQueries({ queryKey: ["clients_all"] });
       setIsOpen(false);
       setFormData({ name: "", whatsapp: "", email: "", gstin: "", upi_vpa: "" });
+      setPhoneError("");
       toast({ title: "Client created successfully" });
     } catch (error) {
       toast({ title: "Error creating client", variant: "destructive" });
+    }
+  };
+
+  const handleWhatsAppChange = (value: string) => {
+    setFormData({ ...formData, whatsapp: value });
+    if (phoneError) {
+      // Clear error when user starts typing
+      const validation = validateIndianMobile(value);
+      if (validation.valid) {
+        setPhoneError("");
+      }
     }
   };
 
@@ -94,8 +116,15 @@ export default function Clients() {
                 <Input
                   id="whatsapp"
                   value={formData.whatsapp}
-                  onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
+                  onChange={(e) => handleWhatsAppChange(e.target.value)}
+                  placeholder="e.g., 9876543210 or +91 98765 43210"
                 />
+                {phoneError && (
+                  <p className="text-sm text-destructive mt-1">{phoneError}</p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Enter 10-digit Indian mobile number starting with 6-9
+                </p>
               </div>
               <div>
                 <Label htmlFor="email">Email</Label>

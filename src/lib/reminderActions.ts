@@ -1,5 +1,5 @@
 import { settings_one, clients_all, invoice_with_items, update_reminder, create_message_log } from "@/data/collections";
-import { buildInvoiceReminderText, buildWhatsAppUrl, sanitizePhone } from "@/services/payments";
+import { buildInvoiceReminderText, buildWhatsAppUrl, sanitizePhoneForWhatsApp } from "@/services/payments";
 
 export async function sendReminderViaWhatsApp(reminder: any) {
   // Load all required data
@@ -27,7 +27,7 @@ export async function sendReminderViaWhatsApp(reminder: any) {
 
   // Launch WhatsApp in a new tab using payment helpers
   const wa = buildWhatsAppUrl({ 
-    phone: sanitizePhone(client.whatsapp), 
+    phone: sanitizePhoneForWhatsApp(client.whatsapp), 
     text: message 
   });
   window.open(wa, "_blank");

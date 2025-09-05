@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { create_client } from "@/data/collections";
 import { useToast } from "@/hooks/use-toast";
+import { validateIndianMobile } from "@/services/payments";
 
 interface AddClientModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ export default function AddClientModal({ isOpen, onClose, onSuccess }: AddClient
     gstin: "",
     upi_vpa: ""
   });
+  const [phoneError, setPhoneError] = useState("");
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -29,10 +31,18 @@ export default function AddClientModal({ isOpen, onClose, onSuccess }: AddClient
         toast({ title: "Client name is required", variant: "destructive" });
         return;
       }
+
+      // Validate phone number
+      const phoneValidation = validateIndianMobile(formData.whatsapp);
+      if (!phoneValidation.valid) {
+        setPhoneError(phoneValidation.error || "Invalid phone number");
+        return;
+      }
       
       const client = await create_client(formData);
       onSuccess(client.id);
       setFormData({ name: "", whatsapp: "", email: "", gstin: "", upi_vpa: "" });
+      setPhoneError("");
       onClose();
       toast({ title: "Client created successfully" });
     } catch (error) {
@@ -45,6 +55,17 @@ export default function AddClientModal({ isOpen, onClose, onSuccess }: AddClient
         toast({ title: "Error: Invalid email format", variant: "destructive" });
       } else {
         toast({ title: `Error creating client: ${errorMessage}`, variant: "destructive" });
+      }
+    }
+  };
+
+  const handleWhatsAppChange = (value: string) => {
+    setFormData({ ...formData, whatsapp: value });
+    if (phoneError) {
+      // Clear error when user starts typing
+      const validation = validateIndianMobile(value);
+      if (validation.valid) {
+        setPhoneError("");
       }
     }
   };
@@ -70,8 +91,15 @@ export default function AddClientModal({ isOpen, onClose, onSuccess }: AddClient
             <Input
               id="whatsapp"
               value={formData.whatsapp}
-              onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
+              onChange={(e) => handleWhatsAppChange(e.target.value)}
+              placeholder="e.g., 9876543210 or +91 98765 43210"
             />
+            {phoneError && (
+              <p className="text-sm text-destructive mt-1">{phoneError}</p>
+            )}
+            <p className="text-xs text-muted-foreground mt-1">
+              Enter 10-digit Indian mobile number starting with 6-9
+            </p>
           </div>
           <div>
             <Label htmlFor="email">Email</Label>

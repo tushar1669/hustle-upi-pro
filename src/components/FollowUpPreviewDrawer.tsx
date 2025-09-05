@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MessageSquare, Mail, Copy, QrCode, RefreshCw, ExternalLink, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { buildInvoiceReminderText, buildWhatsAppUrl, sanitizePhone } from "@/services/payments";
+import { buildInvoiceReminderText, buildWhatsAppUrl, sanitizePhoneForWhatsApp } from "@/services/payments";
 
 interface FollowUpPreviewDrawerProps {
   isOpen: boolean;
@@ -46,7 +46,7 @@ export function FollowUpPreviewDrawer({
   const stage = daysOverdue <= 3 ? 'gentle' : daysOverdue <= 14 ? 'professional' : 'firm';
   
   const isWhatsApp = reminder.channel === 'whatsapp';
-  const hasWhatsApp = Boolean(sanitizePhone(client.whatsapp || ""));
+  const hasWhatsApp = Boolean(sanitizePhoneForWhatsApp(client.whatsapp || ""));
   const hasUpiVpa = Boolean(settings?.upi_vpa);
 
   const handleRebuildMessage = () => {

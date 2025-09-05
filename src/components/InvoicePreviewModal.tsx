@@ -9,7 +9,7 @@ import { settings_one, clients_all, client_detail, items_by_invoice } from "@/da
 import { generateInvoicePDF, downloadPDF } from "@/lib/pdfGenerator";
 import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
-import { formatINR, buildUpiIntent, buildInvoiceReminderText, buildWhatsAppUrl, sanitizePhone } from "@/services/payments";
+import { formatINR, buildUpiIntent, buildInvoiceReminderText, buildWhatsAppUrl, sanitizePhoneForWhatsApp } from "@/services/payments";
 import { toDataURL } from "qrcode";
 
 interface InvoicePreviewModalProps {
@@ -97,7 +97,7 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoice }: Invoic
   };
 
   const handleWhatsAppShare = () => {
-    const url = buildWhatsAppUrl({ phone: sanitizePhone(phoneRaw), text: message });
+    const url = buildWhatsAppUrl({ phone: sanitizePhoneForWhatsApp(phoneRaw), text: message });
     window.open(url, "_blank");
   };
 

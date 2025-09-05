@@ -26,7 +26,7 @@ import {
 import { sendReminderViaWhatsApp } from "@/lib/reminderActions";
 import { useToast } from "@/hooks/use-toast";
 import { useCelebrationContext } from "@/components/CelebrationProvider";
-import { buildInvoiceReminderText, formatINR, buildWhatsAppUrl, sanitizePhone } from "@/services/payments";
+import { buildInvoiceReminderText, formatINR, buildWhatsAppUrl, sanitizePhoneForWhatsApp } from "@/services/payments";
 import { FollowUpPreviewDrawer } from "@/components/FollowUpPreviewDrawer";
 import { RescheduleDialog } from "@/components/RescheduleDialog";
 import QuickFollowupModal from "@/components/followups/QuickFollowupModal";
@@ -221,7 +221,7 @@ export default function FollowUps() {
         }
         
         const url = buildWhatsAppUrl({ 
-          phone: sanitizePhone(client.whatsapp), 
+          phone: sanitizePhoneForWhatsApp(client.whatsapp), 
           text: customMessage 
         });
         window.open(url, "_blank");
