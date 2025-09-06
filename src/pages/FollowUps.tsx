@@ -23,7 +23,7 @@ import {
   bulk_update_reminders,
   create_message_log
 } from "@/data/collections";
-import { sendReminderViaWhatsApp } from "@/lib/reminderActions";
+import { sendReminderViaWhatsApp, sendReminderViaEmail } from "@/lib/reminderActions";
 import { useToast } from "@/hooks/use-toast";
 import { useCelebrationContext } from "@/components/CelebrationProvider";
 import { buildInvoiceReminderText, formatINR, buildWhatsAppUrl, sanitizePhoneForWhatsApp } from "@/services/payments";
@@ -213,8 +213,10 @@ export default function FollowUps() {
 
     setSending(true);
     try {
-      // Use custom message or fallback to sendReminderViaWhatsApp
-      if (customMessage) {
+      // Handle different channels
+      if (reminder.channel === 'email') {
+        await sendReminderViaEmail(reminder);
+      } else if (customMessage) {
         if (!client.whatsapp) {
           toast({ title: "Client has no WhatsApp number", variant: "destructive" });
           return;

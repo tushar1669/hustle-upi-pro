@@ -214,3 +214,62 @@ export function buildInvoiceReminderText(input: {
   
   return { message, upiIntent };
 }
+
+/**
+ * Build invoice reminder email content with subject and body
+ * @param input - Invoice reminder parameters
+ * @returns Object with formatted subject, body, and UPI intent
+ */
+export function buildInvoiceReminderEmail(input: {
+  clientName: string;
+  invoiceNumber: string;
+  amountINR: number;
+  dueDateISO: string;
+  upiVpa: string;
+  businessName: string;
+}): { subject: string; body: string; upiIntent: string } {
+  const dueDate = new Date(input.dueDateISO);
+  const formattedDate = dueDate.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  });
+
+  const subject = `Invoice ${input.invoiceNumber} due on ${formattedDate}`;
+  
+  const upiIntent = buildUpiIntent({
+    pa: input.upiVpa,
+    pn: input.businessName,
+    am: input.amountINR,
+    tn: `INVHH-${input.invoiceNumber}`,
+  });
+
+  const body = `Hi ${input.clientName},
+
+Invoice ${input.invoiceNumber} for ₹${input.amountINR.toLocaleString("en-IN")} is due on ${formattedDate}.
+
+Please make payment using the UPI link below:
+${upiIntent}
+
+Thank you!
+${input.businessName}`;
+
+  return { subject, body, upiIntent };
+}
+
+/**
+ * Build a mailto URL with encoded subject and body
+ * @param params - Email parameters
+ * @returns mailto URL string
+ */
+export function buildMailtoUrl(params: {
+  email: string;
+  subject: string;
+  body: string;
+}): string {
+  const queryParams = new URLSearchParams();
+  queryParams.set('subject', params.subject);
+  queryParams.set('body', params.body);
+  
+  return `mailto:${encodeURIComponent(params.email)}?${queryParams.toString()}`;
+}

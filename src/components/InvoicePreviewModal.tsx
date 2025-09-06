@@ -9,7 +9,7 @@ import { settings_one, clients_all, client_detail, items_by_invoice } from "@/da
 import { generateInvoicePDF, downloadPDF } from "@/lib/pdfGenerator";
 import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
-import { formatINR, buildUpiIntent, buildInvoiceReminderText, buildWhatsAppUrl, sanitizePhoneForWhatsApp } from "@/services/payments";
+import { formatINR, buildUpiIntent, buildInvoiceReminderText, buildInvoiceReminderEmail, buildWhatsAppUrl, buildMailtoUrl, sanitizePhoneForWhatsApp } from "@/services/payments";
 import { toDataURL } from "qrcode";
 
 interface InvoicePreviewModalProps {
@@ -99,6 +99,30 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoice }: Invoic
   const handleWhatsAppShare = () => {
     const url = buildWhatsAppUrl({ phone: sanitizePhoneForWhatsApp(phoneRaw), text: message });
     window.open(url, "_blank");
+  };
+
+  const handleEmailShare = () => {
+    if (!client?.email) {
+      toast({ title: "Client has no email address configured", variant: "destructive" });
+      return;
+    }
+    
+    const { subject, body } = buildInvoiceReminderEmail({
+      clientName,
+      invoiceNumber: invNo,
+      amountINR: amount,
+      dueDateISO: dueISO,
+      upiVpa,
+      businessName: bizName
+    });
+    
+    const mailtoUrl = buildMailtoUrl({
+      email: client.email,
+      subject,
+      body
+    });
+    
+    window.location.href = mailtoUrl;
   };
 
   const handleDownload = async () => {
@@ -337,6 +361,18 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoice }: Invoic
                       >
                         <Share2 className="h-4 w-4 mr-2" />
                         Share on WhatsApp
+                      </Button>
+                    )}
+                    
+                    {client?.email && (
+                      <Button 
+                        variant="outline"
+                        onClick={handleEmailShare}
+                        data-testid="btn-email-share-invoice"
+                        className="flex-1 min-w-[120px]"
+                      >
+                        <Share2 className="h-4 w-4 mr-2" />
+                        Email Invoice
                       </Button>
                     )}
                   </div>

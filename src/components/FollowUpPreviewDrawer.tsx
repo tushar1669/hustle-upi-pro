@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MessageSquare, Mail, Copy, QrCode, RefreshCw, ExternalLink, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { buildInvoiceReminderText, buildWhatsAppUrl, sanitizePhoneForWhatsApp } from "@/services/payments";
+import { buildInvoiceReminderText, buildInvoiceReminderEmail, buildWhatsAppUrl, buildMailtoUrl, sanitizePhoneForWhatsApp } from "@/services/payments";
 
 interface FollowUpPreviewDrawerProps {
   isOpen: boolean;
