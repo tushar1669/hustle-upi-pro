@@ -27,6 +27,9 @@ import { CACHE_KEYS, invalidateInvoiceCaches } from "@/hooks/useCache";
 import { useToast } from "@/hooks/use-toast";
 import { useCelebrationContext } from "@/components/CelebrationProvider";
 import InvoicePreviewModal from "@/components/InvoicePreviewModal";
+import { FollowUpPreviewDrawer } from "@/components/FollowUpPreviewDrawer";
+import { sendReminderViaWhatsApp, sendReminderViaEmail } from "@/lib/reminderActions";
+import { buildInvoiceReminderText, buildInvoiceReminderEmail } from "@/services/payments";
 
 const currency = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
@@ -48,6 +51,9 @@ export default function InvoicesList() {
   const [utrReference, setUtrReference] = useState("");
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [selectedPreviewInvoice, setSelectedPreviewInvoice] = useState<any>(null);
+  const [showReminderDrawer, setShowReminderDrawer] = useState(false);
+  const [selectedReminderInvoice, setSelectedReminderInvoice] = useState<any>(null);
+  const [composedMessage, setComposedMessage] = useState<{ message: string; upiIntent: string } | undefined>();
 
   const clientName = (id: string) => clients.find((c: any) => c.id === id)?.name || "Unknown";
 
@@ -121,57 +127,56 @@ export default function InvoicesList() {
     const client = clients.find((c: any) => c.id === invoice.client_id);
     if (!client || !settings) return;
 
+    setSelectedReminderInvoice(invoice);
+    
+    // Compose initial message for preview
+    const { message, upiIntent } = buildInvoiceReminderText({
+      clientName: client.name,
+      invoiceNumber: invoice.invoice_number,
+      amountINR: invoice.total_amount,
+      dueDateISO: invoice.due_date,
+      status: invoice.status,
+      upiVpa: settings?.upi_vpa || "",
+      businessName: settings?.creator_display_name || "HustleHub"
+    });
+    
+    setComposedMessage({ message, upiIntent });
+    setShowReminderDrawer(true);
+  };
+
+  const handleConfirmReminder = async (customMessage?: string, channel?: 'whatsapp' | 'email') => {
+    if (!selectedReminderInvoice) return;
+    
     try {
-      const reminders = await reminders_by_invoice(invoice.id);
-      const pendingReminder = reminders.find((r: any) => r.status === "pending");
-
-      if (pendingReminder) {
-        const daysOverdue = getDaysOverdue(invoice.due_date, invoice.status);
-        const upiLink = `upi://pay?pa=${settings.upi_vpa}&pn=${encodeURIComponent(
-          settings.creator_display_name
-        )}&am=${invoice.total_amount}&tn=INV%20${invoice.invoice_number}`;
-
-        const message = `Hi ${client.name},
-
-This is a friendly reminder that Invoice ${invoice.invoice_number} for ${currency(
-          invoice.total_amount
-        )} is ${
-          daysOverdue > 0
-            ? `${daysOverdue} days overdue`
-            : `due on ${new Date(invoice.due_date).toLocaleDateString()}`
-        }.
-
-Please make the payment at your earliest convenience.
-
-UPI Link: ${upiLink}
-
-Thank you!`;
-
-        const whatsappUrl = `https://wa.me/${client.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(
-          message
-        )}`;
-        window.open(whatsappUrl, "_blank");
-
-        await update_reminder(pendingReminder.id, { status: "sent" });
-
-        await create_message_log({
-          related_type: "invoice",
-          related_id: invoice.id,
-          channel: "whatsapp",
-          template_used: "reminder_sent",
-          outcome: "sent",
-        });
-
-        queryClient.invalidateQueries({ queryKey: CACHE_KEYS.REMINDERS });
-        queryClient.invalidateQueries({ queryKey: CACHE_KEYS.MESSAGES });
-
-        toast({ title: "Reminder sent successfully" });
-        celebrate("reminder_sent");
+      // Create a temporary reminder object for the action functions
+      const tempReminder = {
+        id: 'temp',
+        invoice_id: selectedReminderInvoice.id,
+        channel: channel || 'whatsapp',
+        status: 'pending'
+      };
+      
+      if (channel === 'email') {
+        await sendReminderViaEmail(tempReminder);
       } else {
-        toast({ title: "No pending reminders for this invoice", variant: "destructive" });
+        await sendReminderViaWhatsApp(tempReminder);
       }
-    } catch {
-      toast({ title: "Error sending reminder", variant: "destructive" });
+      
+      queryClient.invalidateQueries({ queryKey: CACHE_KEYS.REMINDERS });
+      queryClient.invalidateQueries({ queryKey: CACHE_KEYS.MESSAGES });
+      
+      setShowReminderDrawer(false);
+      setSelectedReminderInvoice(null);
+      setComposedMessage(undefined);
+      
+      toast({ title: "Reminder sent successfully" });
+      celebrate("reminder_sent");
+    } catch (error: any) {
+      toast({ 
+        title: "Error sending reminder", 
+        description: error.message,
+        variant: "destructive" 
+      });
     }
   };
 
@@ -408,6 +413,24 @@ Thank you!`;
           }}
           invoice={selectedPreviewInvoice}
           data-testid="invoice-preview-modal"
+        />
+      )}
+
+      {/* Reminder Preview Drawer */}
+      {selectedReminderInvoice && (
+        <FollowUpPreviewDrawer
+          isOpen={showReminderDrawer}
+          onClose={() => {
+            setShowReminderDrawer(false);
+            setSelectedReminderInvoice(null);
+            setComposedMessage(undefined);
+          }}
+          invoice={selectedReminderInvoice}
+          client={clients.find((c: any) => c.id === selectedReminderInvoice.client_id)}
+          settings={settings}
+          composed={composedMessage}
+          onConfirm={handleConfirmReminder}
+          allowChannelSelection={true}
         />
       )}
     </div>

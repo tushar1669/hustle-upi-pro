@@ -6,18 +6,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MessageSquare, Mail, Copy, QrCode, RefreshCw, ExternalLink, AlertTriangle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { buildInvoiceReminderText, buildInvoiceReminderEmail, buildWhatsAppUrl, buildMailtoUrl, sanitizePhoneForWhatsApp } from "@/services/payments";
 
 interface FollowUpPreviewDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  reminder: any;
+  reminder?: any;
   invoice: any;
   client: any;
   settings: any;
   composed?: { message: string; upiIntent: string };
-  onConfirm: (customMessage?: string) => void;
+  onConfirm: (customMessage?: string, channel?: 'whatsapp' | 'email') => void;
+  allowChannelSelection?: boolean;
 }
 
 export function FollowUpPreviewDrawer({ 
@@ -28,10 +30,14 @@ export function FollowUpPreviewDrawer({
   client, 
   settings,
   composed,
-  onConfirm 
+  onConfirm,
+  allowChannelSelection = false
 }: FollowUpPreviewDrawerProps) {
   const { toast } = useToast();
   const [msg, setMsg] = useState(composed?.message || "");
+  const [selectedChannel, setSelectedChannel] = useState<'whatsapp' | 'email'>(
+    allowChannelSelection ? 'whatsapp' : reminder?.channel || 'whatsapp'
+  );
 
   // Update local message when composed changes
   React.useEffect(() => {
@@ -40,29 +46,42 @@ export function FollowUpPreviewDrawer({
     }
   }, [composed]);
 
-  if (!reminder || !invoice || !client) return null;
+  if (!invoice || !client) return null;
 
   const daysOverdue = Math.ceil((new Date().getTime() - new Date(invoice.due_date).getTime()) / (1000 * 60 * 60 * 24));
   const stage = daysOverdue <= 3 ? 'gentle' : daysOverdue <= 14 ? 'professional' : 'firm';
   
-  const isWhatsApp = reminder.channel === 'whatsapp';
+  const isWhatsApp = allowChannelSelection ? selectedChannel === 'whatsapp' : reminder?.channel === 'whatsapp';
   const hasWhatsApp = Boolean(sanitizePhoneForWhatsApp(client.whatsapp || ""));
+  const hasEmail = Boolean(client.email);
   const hasUpiVpa = Boolean(settings?.upi_vpa);
 
   const handleRebuildMessage = () => {
     if (!invoice || !client || !settings) return;
     
-    const { message } = buildInvoiceReminderText({
-      clientName: client.name,
-      invoiceNumber: invoice.invoice_number,
-      amountINR: invoice.total_amount,
-      dueDateISO: invoice.due_date,
-      status: invoice.status,
-      upiVpa: settings?.upi_vpa || "",
-      businessName: settings?.creator_display_name || "HustleHub"
-    });
+    if (isWhatsApp) {
+      const { message } = buildInvoiceReminderText({
+        clientName: client.name,
+        invoiceNumber: invoice.invoice_number,
+        amountINR: invoice.total_amount,
+        dueDateISO: invoice.due_date,
+        status: invoice.status,
+        upiVpa: settings?.upi_vpa || "",
+        businessName: settings?.creator_display_name || "HustleHub"
+      });
+      setMsg(message);
+    } else {
+      const { body } = buildInvoiceReminderEmail({
+        clientName: client.name,
+        invoiceNumber: invoice.invoice_number,
+        amountINR: invoice.total_amount,
+        dueDateISO: invoice.due_date,
+        upiVpa: settings?.upi_vpa || "",
+        businessName: settings?.creator_display_name || "HustleHub"
+      });
+      setMsg(body);
+    }
     
-    setMsg(message);
     toast({ title: "Message rebuilt from invoice data" });
   };
 
@@ -87,7 +106,11 @@ export function FollowUpPreviewDrawer({
       toast({ title: "Client has no WhatsApp number", variant: "destructive" });
       return;
     }
-    onConfirm(msg);
+    if (!hasEmail && !isWhatsApp) {
+      toast({ title: "Client has no email address", variant: "destructive" });
+      return;
+    }
+    onConfirm(msg, allowChannelSelection ? selectedChannel : reminder?.channel);
   };
 
   return (
@@ -111,7 +134,7 @@ export function FollowUpPreviewDrawer({
             </Alert>
           )}
 
-          {/* Alert for missing WhatsApp */}
+          {/* Alert for missing contact info */}
           {!hasWhatsApp && isWhatsApp && (
             <Alert variant="destructive" data-testid="fu-alert-missing-wa">
               <AlertTriangle className="h-4 w-4" />
@@ -119,6 +142,44 @@ export function FollowUpPreviewDrawer({
                 Client has no WhatsApp number configured. Cannot send reminder.
               </AlertDescription>
             </Alert>
+          )}
+          {!hasEmail && !isWhatsApp && (
+            <Alert variant="destructive" data-testid="fu-alert-missing-email">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Client has no email address configured. Cannot send reminder.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Channel Selection */}
+          {allowChannelSelection && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Channel Selection</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <Select value={selectedChannel} onValueChange={(value: 'whatsapp' | 'email') => setSelectedChannel(value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="whatsapp" disabled={!hasWhatsApp}>
+                      <div className="flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4" />
+                        WhatsApp {!hasWhatsApp && "(No number)"}
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="email" disabled={!hasEmail}>
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4" />
+                        Email {!hasEmail && "(No email)"}
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
           )}
 
           {/* Reminder Details */}
@@ -241,7 +302,7 @@ export function FollowUpPreviewDrawer({
             <Button 
               onClick={handleConfirmSend}
               className="flex-1"
-              disabled={!hasWhatsApp && isWhatsApp}
+              disabled={(!hasWhatsApp && isWhatsApp) || (!hasEmail && !isWhatsApp)}
               data-testid="btn-confirm-send"
             >
               Confirm & Send
