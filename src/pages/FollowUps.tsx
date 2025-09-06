@@ -673,29 +673,42 @@ export default function FollowUps() {
                         {reminder.status.toUpperCase()}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {reminder.status === 'pending' && (
-                          <>
-                            <Button 
-                              size="sm" 
-                              onClick={() => handleSendNow(reminder)}
-                              data-testid="btn-open-reminder-preview"
-                            >
-                              <Send className="h-4 w-4 mr-1" />
-                              Send
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleSkip(reminder)}>
-                              Skip
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleReschedule(reminder)}>
-                              <Calendar className="h-4 w-4 mr-1" />
-                              Reschedule
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
+                     <TableCell className="text-right">
+                       <div className="flex items-center justify-end gap-2">
+                         {reminder.status === 'pending' && (
+                           <>
+                             {reminder.channel === 'whatsapp' ? (
+                               <Button 
+                                 size="sm" 
+                                 onClick={() => handleSendNow(reminder)}
+                                 data-testid="btn-open-reminder-preview"
+                                 disabled={!client.whatsapp}
+                               >
+                                 <MessageSquare className="h-4 w-4 mr-1" />
+                                 WhatsApp
+                               </Button>
+                             ) : (
+                               <Button 
+                                 size="sm" 
+                                 onClick={() => handleSendNow(reminder)}
+                                 data-testid="btn-open-reminder-preview"
+                                 disabled={!client.email}
+                               >
+                                 <Mail className="h-4 w-4 mr-1" />
+                                 Email
+                               </Button>
+                             )}
+                             <Button size="sm" variant="outline" onClick={() => handleSkip(reminder)}>
+                               Skip
+                             </Button>
+                             <Button size="sm" variant="outline" onClick={() => handleReschedule(reminder)}>
+                               <Calendar className="h-4 w-4 mr-1" />
+                               Reschedule
+                             </Button>
+                           </>
+                         )}
+                       </div>
+                     </TableCell>
                   </TableRow>
                 );
               })}
