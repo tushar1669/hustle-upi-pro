@@ -162,9 +162,8 @@ export default function CreateInvoice() {
     toast({ title: "Client created and selected" });
   };
 
-  const handleProjectCreated = (newProjectId: string) => {
+  const handleProjectCreated = () => {
     refetchProjects();
-    setProjectId(newProjectId);
     queryClient.invalidateQueries({ queryKey: CACHE_KEYS.PROJECTS });
   };
 

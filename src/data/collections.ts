@@ -71,6 +71,24 @@ export async function create_project(payload: { client_id: string; name: string;
   return data;
 }
 
+/**
+ * Update a project with partial changes
+ */
+export async function update_project(id: string, changes: Partial<{ name: string; client_id: string | null; is_billable: boolean }>) {
+  const { data, error } = await supabase.from("projects").update(changes).eq("id", id).select("*").single();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Delete a project by ID
+ */
+export async function delete_project(id: string) {
+  const { data, error } = await supabase.from("projects").delete().eq("id", id).select("*").single();
+  if (error) throw error;
+  return data;
+}
+
 // ============ Invoices ============
 export async function invoices_all() {
   const { data, error } = await supabase

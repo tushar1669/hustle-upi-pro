@@ -36,6 +36,13 @@ export const invalidateClientCaches = (queryClient: any) => {
   ]);
 };
 
+export const invalidateProjectCaches = (queryClient: any) => {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: CACHE_KEYS.PROJECTS }),
+    queryClient.invalidateQueries({ queryKey: CACHE_KEYS.TASKS })
+  ]);
+};
+
 export const invalidateSavingsGoalsCaches = (queryClient: any) => {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: CACHE_KEYS.SAVINGS_GOALS }),
