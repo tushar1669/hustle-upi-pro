@@ -417,6 +417,43 @@ export async function delete_savings_goal(id: string) {
   return true;
 }
 
+// Savings Entry data operations
+export async function entries_by_goal(goal_id: string) {
+  const { data, error } = await (supabase as any)
+    .from('savings_entries')
+    .select('*')
+    .eq('goal_id', goal_id)
+    .order('created_at', { ascending: false });
+  
+  if (error) throw error;
+  return data || [];
+}
+
+export async function create_entry(payload: {
+  goal_id: string;
+  amount: number;
+  note?: string;
+}) {
+  const { data, error } = await (supabase as any)
+    .from('savings_entries')
+    .insert([payload])
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data;
+}
+
+export async function delete_entry(id: string) {
+  const { error } = await (supabase as any)
+    .from('savings_entries')
+    .delete()
+    .eq('id', id);
+  
+  if (error) throw error;
+  return true;
+}
+
 // ============ Dashboard View ============
 export async function v_dashboard_metrics() {
   const { data, error } = await supabase.from("v_dashboard_metrics").select("*").limit(1).maybeSingle();

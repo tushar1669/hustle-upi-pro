@@ -46,6 +46,7 @@ export const invalidateProjectCaches = (queryClient: any) => {
 export const invalidateSavingsGoalsCaches = (queryClient: any) => {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: CACHE_KEYS.SAVINGS_GOALS }),
+    queryClient.invalidateQueries({ queryKey: ["savings_entries"] }),
     queryClient.invalidateQueries({ queryKey: CACHE_KEYS.DASHBOARD })
   ]);
 };

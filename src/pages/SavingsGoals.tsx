@@ -1,18 +1,15 @@
-import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Trash2, Edit, Plus, Target, TrendingUp, Percent, PlusCircle } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import SEO from "@/components/SEO";
-import { AddSavingsGoalModal } from "@/components/AddSavingsGoalModal";
-import { Target, Plus, TrendingUp, PiggyBank, Edit, Trash2 } from "lucide-react";
-import { savings_goals_all, delete_savings_goal } from "@/data/collections";
-import { CACHE_KEYS } from "@/hooks/useCache";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { savings_goals_all, delete_savings_goal, entries_by_goal } from "@/data/collections";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import GoalModal from "@/components/GoalModal";
+import AddEntryModal from "@/components/AddEntryModal";
+import { invalidateSavingsGoalsCaches } from "@/hooks/useCache";
 
 interface SavingsGoal {
   id: string;
@@ -24,243 +21,271 @@ interface SavingsGoal {
   created_at?: string;
 }
 
-const SavingsGoals = () => {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingGoal, setEditingGoal] = useState<SavingsGoal | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [goalToDelete, setGoalToDelete] = useState<string | null>(null);
+interface SavingsEntry {
+  id: string;
+  goal_id: string;
+  amount: number;
+  note?: string;
+  created_at: string;
+}
 
-  const { data: goals = [], isLoading } = useQuery({
-    queryKey: CACHE_KEYS.SAVINGS_GOALS,
-    queryFn: async () => {
-      const data = await savings_goals_all();
-      return data as SavingsGoal[];
-    },
+export default function SavingsGoals() {
+  const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
+  const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
+  const [editingGoal, setEditingGoal] = useState<SavingsGoal | null>(null);
+  const [selectedGoal, setSelectedGoal] = useState<SavingsGoal | null>(null);
+  const [deleteGoalId, setDeleteGoalId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  // Fetch all savings goals
+  const { data: goals = [], isLoading, error } = useQuery({
+    queryKey: ["savings_goals_all"],
+    queryFn: savings_goals_all,
   });
 
-  const getProgress = (current: number, target: number) => (target > 0 ? (current / target) * 100 : 0);
+  // Fetch entries for all goals to calculate actual progress
+  const { data: allEntries = [] } = useQuery({
+    queryKey: ["savings_entries"],
+    queryFn: async () => {
+      const entriesPromises = goals.map((goal: SavingsGoal) => 
+        entries_by_goal(goal.id).then(entries => ({ goalId: goal.id, entries }))
+      );
+      const results = await Promise.all(entriesPromises);
+      return results.reduce((acc, { goalId, entries }) => {
+        acc[goalId] = entries;
+        return acc;
+      }, {} as Record<string, SavingsEntry[]>);
+    },
+    enabled: goals.length > 0,
+  });
 
-  const handleEdit = (goal: SavingsGoal) => {
-    setEditingGoal(goal);
-    setModalOpen(true);
+  // Calculate actual saved amount from entries
+  const getActualSaved = (goalId: string) => {
+    const entries = allEntries[goalId] || [];
+    return entries.reduce((sum, entry) => sum + entry.amount, 0);
   };
 
+  // Helper function to calculate progress percentage
+  const getProgress = (saved: number, target: number) => {
+    return Math.min((saved / target) * 100, 100);
+  };
+
+  // Handle editing a goal
+  const handleEdit = (goal: SavingsGoal) => {
+    setEditingGoal(goal);
+    setIsGoalModalOpen(true);
+  };
+
+  // Handle adding entry to goal
+  const handleAddEntry = (goal: SavingsGoal) => {
+    setSelectedGoal(goal);
+    setIsEntryModalOpen(true);
+  };
+
+  // Handle deleting a goal
   const handleDelete = async (goalId: string) => {
     try {
       await delete_savings_goal(goalId);
-      queryClient.invalidateQueries({ queryKey: CACHE_KEYS.SAVINGS_GOALS });
-      queryClient.invalidateQueries({ queryKey: CACHE_KEYS.DASHBOARD });
+      invalidateSavingsGoalsCaches(queryClient);
       toast({ title: "Goal deleted successfully" });
-    } catch (error: any) {
+    } catch (error) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete goal",
+        title: "Error deleting goal",
         variant: "destructive",
       });
-    } finally {
-      setDeleteDialogOpen(false);
-      setGoalToDelete(null);
     }
+    setDeleteGoalId(null);
   };
 
-  const handleModalSave = () => {
-    queryClient.invalidateQueries({ queryKey: CACHE_KEYS.SAVINGS_GOALS });
-    queryClient.invalidateQueries({ queryKey: CACHE_KEYS.DASHBOARD });
+  // Handle modal success
+  const handleModalSuccess = () => {
+    invalidateSavingsGoalsCaches(queryClient);
+  };
+
+  // Handle goal modal close
+  const handleGoalModalClose = () => {
+    setIsGoalModalOpen(false);
     setEditingGoal(null);
   };
 
-  const handleModalClose = () => {
-    setModalOpen(false);
-    setEditingGoal(null);
+  // Handle entry modal close
+  const handleEntryModalClose = () => {
+    setIsEntryModalOpen(false);
+    setSelectedGoal(null);
   };
 
-  // Calculate summary stats
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>Error loading savings goals</div>;
+
+  // Calculate summary statistics using actual entries
   const totalGoals = goals.length;
-  const totalSaved = goals.reduce((sum, goal) => sum + (goal.saved_amount || 0), 0);
-  const averageProgress = totalGoals > 0
-    ? goals.reduce((sum, goal) => sum + getProgress(goal.saved_amount || 0, goal.target_amount || 0), 0) / totalGoals
+  const totalSaved = goals.reduce((sum: number, goal: SavingsGoal) => {
+    return sum + getActualSaved(goal.id);
+  }, 0);
+  const averageProgress = totalGoals > 0 
+    ? goals.reduce((sum: number, goal: SavingsGoal) => {
+        const saved = getActualSaved(goal.id);
+        return sum + getProgress(saved, goal.target_amount);
+      }, 0) / totalGoals 
     : 0;
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <SEO title="Savings Goals — HustleHub" description="Track your financial goals and savings progress" />
-        <div className="flex items-center justify-center py-12">
-          <div className="text-muted-foreground">Loading goals...</div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
-      <SEO title="Savings Goals — HustleHub" description="Track your financial goals and savings progress" />
-      
-      <div className="flex items-center justify-between">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Savings Goals</h1>
-          <p className="text-muted-foreground">Set and track your financial milestones</p>
+          <h1 className="text-3xl font-bold tracking-tight">Savings Goals</h1>
+          <p className="text-muted-foreground">Track your financial progress</p>
         </div>
-        <Button 
-          className="flex items-center gap-2" 
-          onClick={() => setModalOpen(true)}
-          data-testid="btn-add-goal"
-        >
-          <Plus className="w-4 h-4" />
+        <Button onClick={() => setIsGoalModalOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
           New Goal
         </Button>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <Target className="w-4 h-4 text-primary" />
-              Total Goals
-            </CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Goals</CardTitle>
+            <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary" data-testid="sg-total-target">{totalGoals}</div>
-            <p className="text-xs text-muted-foreground">goals created</p>
+            <div className="text-2xl font-bold">{totalGoals}</div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <PiggyBank className="w-4 h-4 text-success" />
-              Total Saved
-            </CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Saved</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success" data-testid="sg-total-saved">₹{totalSaved.toLocaleString("en-IN")}</div>
-            <p className="text-xs text-muted-foreground">across all goals</p>
+            <div className="text-2xl font-bold">₹{totalSaved.toLocaleString()}</div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <TrendingUp className="w-4 h-4 text-accent" />
-              Average Progress
-            </CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Average Progress</CardTitle>
+            <Percent className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-accent" data-testid="sg-total-progress">{averageProgress.toFixed(1)}%</div>
-            <p className="text-xs text-muted-foreground">completion rate</p>
+            <div className="text-2xl font-bold">{averageProgress.toFixed(1)}%</div>
           </CardContent>
         </Card>
       </div>
 
       {/* Goals List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {goals.map((goal) => {
-          const progress = getProgress(goal.saved_amount || 0, goal.target_amount || 0);
-          const isHighProgress = progress > 80;
-          
-          return (
-            <Card key={goal.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Target className="w-5 h-5 text-primary" />
-                      {goal.title}
-                    </CardTitle>
-                    {goal.target_date && (
-                      <p className="text-sm text-muted-foreground">
-                        Target: {format(new Date(goal.target_date), "MMM dd, yyyy")}
-                      </p>
-                    )}
+      {goals.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <Target className="h-16 w-16 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No goals yet</h3>
+            <p className="text-muted-foreground text-center mb-6">
+              Start your savings journey by creating your first goal
+            </p>
+            <Button onClick={() => setIsGoalModalOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create First Goal
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {goals.map((goal: SavingsGoal) => {
+            const actualSaved = getActualSaved(goal.id);
+            const progress = getProgress(actualSaved, goal.target_amount);
+            
+            return (
+              <Card key={goal.id}>
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <CardTitle className="text-lg">{goal.title}</CardTitle>
+                      {goal.target_date && (
+                        <p className="text-sm text-muted-foreground">
+                          Target: {new Date(goal.target_date).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleAddEntry(goal)}
+                        title="Add Entry"
+                      >
+                        <PlusCircle className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEdit(goal)}
+                        title="Edit Goal"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDeleteGoalId(goal.id)}
+                        title="Delete Goal"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                  {goal.type && (
-                    <Badge variant="outline">{goal.type}</Badge>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between text-sm">
-                  <span>Progress</span>
-                  <span>₹{(goal.saved_amount || 0).toLocaleString("en-IN")} of ₹{(goal.target_amount || 0).toLocaleString("en-IN")}</span>
-                </div>
-                <Progress 
-                  value={progress} 
-                  className={cn("h-3", isHighProgress && "progress-high")}
-                  data-testid={`progress-bar-goal-${goal.id}`}
-                />
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">
-                    {Math.round(progress)}% complete
-                  </span>
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleEdit(goal)}
-                      data-testid="btn-edit-goal"
-                    >
-                      <Edit className="w-3 h-3 mr-1" />
-                      Edit
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => {
-                        setGoalToDelete(goal.id);
-                        setDeleteDialogOpen(true);
-                      }}
-                      data-testid="btn-delete-goal"
-                    >
-                      <Trash2 className="w-3 h-3 mr-1" />
-                      Delete
-                    </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span>₹{actualSaved.toLocaleString()}</span>
+                      <span>₹{goal.target_amount.toLocaleString()}</span>
+                    </div>
+                    <Progress value={progress} className="h-2" />
+                    <div className="text-sm text-muted-foreground text-center">
+                      {progress.toFixed(1)}% complete
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {goals.length === 0 && (
-        <div className="text-center py-12">
-          <Target className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Start Your First Savings Goal</h3>
-          <p className="text-muted-foreground mb-4">
-            Set financial targets and track your progress towards achieving them.
-          </p>
-          <Button onClick={() => setModalOpen(true)} data-testid="btn-add-goal">
-            Create Your First Goal
-          </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
-      {/* Add/Edit Goal Modal */}
-      <AddSavingsGoalModal
-        isOpen={modalOpen}
-        onClose={handleModalClose}
-        onSave={handleModalSave}
+      {/* Goal Modal */}
+      <GoalModal
+        isOpen={isGoalModalOpen}
+        onClose={handleGoalModalClose}
+        onSuccess={handleModalSuccess}
         goal={editingGoal}
       />
 
+      {/* Add Entry Modal */}
+      {selectedGoal && (
+        <AddEntryModal
+          isOpen={isEntryModalOpen}
+          onClose={handleEntryModalClose}
+          onSuccess={handleModalSuccess}
+          goalId={selectedGoal.id}
+          goalTitle={selectedGoal.title}
+        />
+      )}
+
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialog open={!!deleteGoalId} onOpenChange={() => setDeleteGoalId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Goal</AlertDialogTitle>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this savings goal? This action cannot be undone.
+              This action cannot be undone. This will permanently delete your savings goal and all associated entries.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => goalToDelete && handleDelete(goalToDelete)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
+            <AlertDialogAction onClick={() => deleteGoalId && handleDelete(deleteGoalId)}>
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -268,6 +293,4 @@ const SavingsGoals = () => {
       </AlertDialog>
     </div>
   );
-};
-
-export default SavingsGoals;
+}
