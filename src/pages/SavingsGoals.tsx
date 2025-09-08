@@ -2,13 +2,14 @@ import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Trash2, Edit, Plus, Target, TrendingUp, Percent, PlusCircle } from "lucide-react";
+import { Trash2, Edit, Plus, Target, TrendingUp, Percent, PlusCircle, ClipboardList } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { savings_goals_all, delete_savings_goal, entries_by_goal } from "@/data/collections";
 import { useToast } from "@/hooks/use-toast";
 import GoalModal from "@/components/GoalModal";
 import AddEntryModal from "@/components/AddEntryModal";
+import GoalEntriesDrawer from "@/components/GoalEntriesDrawer";
 import { invalidateSavingsGoalsCaches } from "@/hooks/useCache";
 
 interface SavingsGoal {
@@ -35,6 +36,7 @@ export default function SavingsGoals() {
   const [editingGoal, setEditingGoal] = useState<SavingsGoal | null>(null);
   const [selectedGoal, setSelectedGoal] = useState<SavingsGoal | null>(null);
   const [deleteGoalId, setDeleteGoalId] = useState<string | null>(null);
+  const [entriesFor, setEntriesFor] = useState<{id: string, title: string} | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -213,6 +215,14 @@ export default function SavingsGoals() {
                       <Button
                         variant="ghost"
                         size="sm"
+                        onClick={() => setEntriesFor({ id: goal.id, title: goal.title })}
+                        title="View entries"
+                      >
+                        <ClipboardList className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => handleAddEntry(goal)}
                         title="Add Entry"
                       >
@@ -271,6 +281,16 @@ export default function SavingsGoals() {
           onSuccess={handleModalSuccess}
           goalId={selectedGoal.id}
           goalTitle={selectedGoal.title}
+        />
+      )}
+
+      {/* Entries Drawer */}
+      {entriesFor && (
+        <GoalEntriesDrawer
+          isOpen={!!entriesFor}
+          onClose={() => setEntriesFor(null)}
+          goalId={entriesFor.id}
+          goalTitle={entriesFor.title}
         />
       )}
 
