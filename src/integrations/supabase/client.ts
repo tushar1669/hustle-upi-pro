@@ -2,8 +2,11 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = "https://jldeysxlrcvggssvighb.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpsZGV5c3hscmN2Z2dzc3ZpZ2hiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ5NDE3NzQsImV4cCI6MjA3MDUxNzc3NH0.RY2b84Ypn_RRpzc_aYM1igj1uOetyxQr-WYW1Inyv7U";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://jldeysxlrcvggssvighb.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpsZGV5c3hscmN2Z2dzc3ZpZ2hiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ5NDE3NzQsImV4cCI6MjA3MDUxNzc3NH0.RY2b84Ypn_RRpzc_aYM1igj1uOetyxQr-WYW1Inyv7U";
+
+// Demo mode flag
+export const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";

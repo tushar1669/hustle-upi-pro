@@ -73,6 +73,16 @@ VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
+## 🎯 Demo Mode
+
+For previews and demonstrations, you can bypass authentication:
+
+1. **Enable demo mode**: Set `VITE_DEMO_MODE=true` in your `.env` file
+2. **Start development**: Run `npm run dev`
+3. **Populate demo data**: Visit `/qa` → click "Populate" button (if available)
+
+**⚠️ Security Note**: Never enable demo mode with real data or in production environments.
+
 ## 📖 Documentation
 
 - [**Status & Roadmap**](docs/STATUS.md) — Current feature status and development plan
