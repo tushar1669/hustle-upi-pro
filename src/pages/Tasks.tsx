@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { CalendarIcon, Edit3, List, Layout, Check } from "lucide-react";
+import { CalendarIcon, Edit3, List, Layout, Check, Loader2 } from "lucide-react";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -154,19 +154,20 @@ function TaskEditModal({
             </Select>
           </div>
 
-          <div>
-            <Label htmlFor="t-due">Due Date</Label>
-            <div className="flex items-center gap-2">
-              <Input
-                id="t-due"
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="max-w-[200px]"
-              />
-              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <Label htmlFor="t-due">Due Date</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="t-due"
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="max-w-[200px]"
+                  min={new Date().toISOString().split('T')[0]}
+                />
+                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+              </div>
             </div>
-          </div>
 
           <div className="flex items-center gap-2">
             <input
@@ -184,7 +185,14 @@ function TaskEditModal({
             Cancel
           </Button>
           <Button data-testid="task-edit-save" onClick={handleSave} disabled={saving}>
-            {saving ? "Saving..." : "Save"}
+            {saving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              "Save"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

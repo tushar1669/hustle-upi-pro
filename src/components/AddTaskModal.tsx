@@ -10,6 +10,7 @@ import { create_task, create_message_log, projects_all } from "@/data/collection
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { CACHE_KEYS } from "@/hooks/useCache";
+import { Loader2 } from "lucide-react";
 
 interface AddTaskModalProps {
   isOpen: boolean;
@@ -25,12 +26,13 @@ export default function AddTaskModal({ isOpen, onClose, onSuccess }: AddTaskModa
     is_billable: false,
     notes: ""
   });
+  const [saving, setSaving] = useState(false);
   const { toast } = useToast();
   const { data: projects = [] } = useQuery({ queryKey: CACHE_KEYS.PROJECTS, queryFn: projects_all });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({ title: "Creating task..." });
+    setSaving(true);
     
     try {
       const task = await create_task({
@@ -55,10 +57,16 @@ export default function AddTaskModal({ isOpen, onClose, onSuccess }: AddTaskModa
       onSuccess();
       setFormData({ title: "", project_id: "", due_date: "", is_billable: false, notes: "" });
       onClose();
-      toast({ title: "✅ Task created successfully" });
+      toast({ title: "Task created successfully" });
     } catch (error: any) {
       console.error('Task creation error:', error);
-      toast({ title: "❌ Error creating task", description: error.message || "Unknown error", variant: "destructive" });
+      toast({
+        title: "Error creating task",
+        description: error?.message ?? "Something went wrong",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -85,6 +93,7 @@ export default function AddTaskModal({ isOpen, onClose, onSuccess }: AddTaskModa
                 <SelectValue placeholder="Select project (optional)" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="">No project</SelectItem>
                 {projects.map((project: any) => (
                   <SelectItem key={project.id} value={project.id}>
                     {project.name}
@@ -100,6 +109,7 @@ export default function AddTaskModal({ isOpen, onClose, onSuccess }: AddTaskModa
               type="date"
               value={formData.due_date}
               onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+              min={new Date().toISOString().split('T')[0]}
             />
           </div>
           <div className="flex items-center space-x-2">
@@ -123,7 +133,16 @@ export default function AddTaskModal({ isOpen, onClose, onSuccess }: AddTaskModa
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit">Create Task</Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Task"
+              )}
+            </Button>
           </div>
         </form>
       </DialogContent>

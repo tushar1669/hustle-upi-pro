@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import SEO from "@/components/SEO";
 import AddProjectModal from "@/components/AddProjectModal";
 import { FolderKanban, Plus, Edit, Trash2 } from "lucide-react";
@@ -19,7 +20,7 @@ const Projects = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: projects = [], isLoading } = useQuery({
+  const { data: projects = [], isLoading, error } = useQuery({
     queryKey: CACHE_KEYS.PROJECTS,
     queryFn: projects_all
   });
@@ -49,9 +50,9 @@ const Projects = () => {
     } catch (error: any) {
       toast({
         title: "Error deleting project",
-        description: error.message?.includes("foreign key") 
+        description: error?.message?.includes("foreign key") 
           ? "Cannot delete project with existing tasks. Please reassign or delete tasks first."
-          : "Failed to delete project",
+          : error?.message ?? "Something went wrong",
         variant: "destructive"
       });
     }
@@ -66,9 +67,62 @@ const Projects = () => {
     return (
       <div className="space-y-6">
         <SEO title="Projects — HustleHub" description="Manage your business projects and track progress" />
-        <div className="flex items-center justify-center py-12">
-          <div className="text-muted-foreground">Loading projects...</div>
+        <div className="flex items-center justify-between">
+          <div>
+            <Skeleton className="h-9 w-24 mb-2" />
+            <Skeleton className="h-5 w-64" />
+          </div>
+          <Skeleton className="h-10 w-32" />
         </div>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-32" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {[1, 2, 3].map(i => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <SEO title="Projects — HustleHub" description="Manage your business projects and track progress" />
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Projects</h1>
+            <p className="text-muted-foreground">Organize and track your client projects</p>
+          </div>
+          <Button 
+            className="flex items-center gap-2"
+            onClick={() => {
+              setEditProject(null);
+              setShowAddModal(true);
+            }}
+          >
+            <Plus className="w-4 h-4" />
+            New Project
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="text-center py-12">
+            <div className="text-destructive font-medium mb-2">
+              Error loading projects
+            </div>
+            <p className="text-muted-foreground mb-4">
+              There was a problem loading your projects. Please try refreshing the page.
+            </p>
+            <Button onClick={() => window.location.reload()}>
+              Refresh Page
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

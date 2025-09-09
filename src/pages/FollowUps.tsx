@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Clock, Send, MessageSquare, Mail, TrendingUp, Filter, Calendar, X, Search } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { 
   invoices_all, 
@@ -48,8 +50,8 @@ interface Filters {
 
 export default function FollowUps() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { data: invoices = [] } = useQuery({ queryKey: ["invoices_all"], queryFn: invoices_all });
-  const { data: clients = [] } = useQuery({ queryKey: ["clients_all"], queryFn: clients_all });
+  const { data: invoices = [], isLoading: invoicesLoading } = useQuery({ queryKey: ["invoices_all"], queryFn: invoices_all });
+  const { data: clients = [], isLoading: clientsLoading } = useQuery({ queryKey: ["clients_all"], queryFn: clients_all });
   const { data: messageLog = [] } = useQuery({ queryKey: ["message_log_recent"], queryFn: message_log_recent });
   const { data: settings } = useQuery({ queryKey: ["settings_one"], queryFn: settings_one });
   
@@ -94,7 +96,7 @@ export default function FollowUps() {
   }, [filters, setSearchParams]);
 
   // Query reminders with filters
-  const { data: allReminders = [] } = useQuery({ 
+  const { data: allReminders = [], isLoading: remindersLoading, error: remindersError } = useQuery({ 
     queryKey: ["reminders_by_filters", filters], 
     queryFn: () => reminders_by_filters(filters)
   });
@@ -200,8 +202,12 @@ export default function FollowUps() {
       celebrate('reminder_sent');
       invalidateCaches();
       toast({ title: "Reminder sent (simulated)" });
-    } catch (error) {
-      toast({ title: "Error sending reminder", variant: "destructive" });
+    } catch (error: any) {
+      toast({
+        title: "Error sending reminder",
+        description: error?.message ?? "Something went wrong",
+        variant: "destructive"
+      });
     }
   };
 
@@ -270,8 +276,12 @@ export default function FollowUps() {
 
       invalidateCaches();
       toast({ title: "Reminder skipped" });
-    } catch (error) {
-      toast({ title: "Error skipping reminder", variant: "destructive" });
+    } catch (error: any) {
+      toast({
+        title: "Error skipping reminder",
+        description: error?.message ?? "Something went wrong",
+        variant: "destructive"
+      });
     }
   };
 
@@ -301,8 +311,12 @@ export default function FollowUps() {
       
       invalidateCaches();
       setRescheduleDialog({ isOpen: false });
-    } catch (error) {
-      toast({ title: "Error rescheduling reminder", variant: "destructive" });
+    } catch (error: any) {
+      toast({
+        title: "Error rescheduling reminder",
+        description: error?.message ?? "Something went wrong",
+        variant: "destructive"
+      });
     }
   };
 
@@ -335,8 +349,12 @@ export default function FollowUps() {
       celebrate('reminder_sent');
       invalidateCaches();
       toast({ title: `${selectedPending.length} reminders sent (simulated)` });
-    } catch (error) {
-      toast({ title: "Error sending reminders", variant: "destructive" });
+    } catch (error: any) {
+      toast({
+        title: "Error sending reminders",
+        description: error?.message ?? "Something went wrong",
+        variant: "destructive"
+      });
     }
   };
 
@@ -366,8 +384,12 @@ export default function FollowUps() {
       setSelectedReminders(new Set());
       invalidateCaches();
       toast({ title: `${selectedPending.length} reminders skipped` });
-    } catch (error) {
-      toast({ title: "Error skipping reminders", variant: "destructive" });
+    } catch (error: any) {
+      toast({
+        title: "Error skipping reminders",
+        description: error?.message ?? "Something went wrong",
+        variant: "destructive"
+      });
     }
   };
 
@@ -426,9 +448,73 @@ export default function FollowUps() {
     .filter(r => r.status === 'pending')
     .every(r => selectedReminders.has(r.id));
 
+  // Show loading state
+  if (invoicesLoading || clientsLoading || remindersLoading) {
+    return (
+      <div className="space-y-6">
+        <SEO title="HustleHub — Follow-ups" description="Automated follow-ups and payment reminders overview." />
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold">Follow-ups Worklist</h1>
+          <Skeleton className="h-10 w-40" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => (
+            <Card key={i}>
+              <CardHeader className="pb-2">
+                <Skeleton className="h-4 w-32" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-16 mb-2" />
+                <Skeleton className="h-3 w-24" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-48" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {[1, 2, 3].map(i => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (remindersError) {
+    return (
+      <div className="space-y-6">
+        <SEO title="HustleHub — Follow-ups" description="Automated follow-ups and payment reminders overview." />
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold">Follow-ups Worklist</h1>
+        </div>
+        <Card>
+          <CardContent className="text-center py-12">
+            <div className="text-destructive font-medium mb-2">
+              Error loading follow-ups
+            </div>
+            <p className="text-muted-foreground mb-4">
+              There was a problem loading your follow-ups. Please try refreshing the page.
+            </p>
+            <Button onClick={() => window.location.reload()}>
+              Refresh Page
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      <SEO title="HustleHub — Follow-ups" description="Automated follow-ups and payment reminders overview." />
+    <TooltipProvider>
+      <div className="space-y-6">
+        <SEO title="HustleHub — Follow-ups" description="Automated follow-ups and payment reminders overview." />
       
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Follow-ups Worklist</h1>
@@ -687,17 +773,26 @@ export default function FollowUps() {
                                  <MessageSquare className="h-4 w-4 mr-1" />
                                  WhatsApp
                                </Button>
-                             ) : (
-                               <Button 
-                                 size="sm" 
-                                 onClick={() => handleSendNow(reminder)}
-                                 data-testid="btn-open-reminder-preview"
-                                 disabled={!client.email}
-                               >
-                                 <Mail className="h-4 w-4 mr-1" />
-                                 Email
-                               </Button>
-                             )}
+                              ) : (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button 
+                                      size="sm" 
+                                      onClick={() => handleSendNow(reminder)}
+                                      data-testid="btn-open-reminder-preview"
+                                      disabled={!client.email}
+                                    >
+                                      <Mail className="h-4 w-4 mr-1" />
+                                      Email
+                                    </Button>
+                                  </TooltipTrigger>
+                                  {!client.email && (
+                                    <TooltipContent>
+                                      <p>Add an email to this client to enable email reminders</p>
+                                    </TooltipContent>
+                                  )}
+                                </Tooltip>
+                              )}
                              <Button size="sm" variant="outline" onClick={() => handleSkip(reminder)}>
                                Skip
                              </Button>
@@ -756,6 +851,7 @@ export default function FollowUps() {
         isOpen={quickFollowupModal}
         onClose={() => setQuickFollowupModal(false)}
       />
-    </div>
+      </div>
+    </TooltipProvider>
   );
 }
