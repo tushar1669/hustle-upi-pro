@@ -22,7 +22,7 @@ export type Database = {
           gstin: string | null
           id: string
           name: string
-          owner_id: string | null
+          owner_id: string
           suggested_hour: string | null
           upi_vpa: string | null
           whatsapp: string | null
@@ -34,7 +34,7 @@ export type Database = {
           gstin?: string | null
           id?: string
           name: string
-          owner_id?: string | null
+          owner_id?: string
           suggested_hour?: string | null
           upi_vpa?: string | null
           whatsapp?: string | null
@@ -46,7 +46,7 @@ export type Database = {
           gstin?: string | null
           id?: string
           name?: string
-          owner_id?: string | null
+          owner_id?: string
           suggested_hour?: string | null
           upi_vpa?: string | null
           whatsapp?: string | null
@@ -100,7 +100,8 @@ export type Database = {
           id: string
           invoice_number: string
           issue_date: string | null
-          owner_id: string | null
+          owner_id: string
+          paid_at: string | null
           paid_date: string | null
           pdf_url: string | null
           project_id: string | null
@@ -119,7 +120,8 @@ export type Database = {
           id?: string
           invoice_number: string
           issue_date?: string | null
-          owner_id?: string | null
+          owner_id?: string
+          paid_at?: string | null
           paid_date?: string | null
           pdf_url?: string | null
           project_id?: string | null
@@ -138,7 +140,8 @@ export type Database = {
           id?: string
           invoice_number?: string
           issue_date?: string | null
-          owner_id?: string | null
+          owner_id?: string
+          paid_at?: string | null
           paid_date?: string | null
           pdf_url?: string | null
           project_id?: string | null
@@ -171,7 +174,7 @@ export type Database = {
           channel: Database["public"]["Enums"]["channel_type"] | null
           id: string
           outcome: string | null
-          owner_id: string | null
+          owner_id: string
           related_id: string
           related_type: string
           sent_at: string | null
@@ -181,7 +184,7 @@ export type Database = {
           channel?: Database["public"]["Enums"]["channel_type"] | null
           id?: string
           outcome?: string | null
-          owner_id?: string | null
+          owner_id?: string
           related_id: string
           related_type: string
           sent_at?: string | null
@@ -191,7 +194,7 @@ export type Database = {
           channel?: Database["public"]["Enums"]["channel_type"] | null
           id?: string
           outcome?: string | null
-          owner_id?: string | null
+          owner_id?: string
           related_id?: string
           related_type?: string
           sent_at?: string | null
@@ -206,7 +209,7 @@ export type Database = {
           id: string
           is_billable: boolean | null
           name: string
-          owner_id: string | null
+          owner_id: string
         }
         Insert: {
           client_id?: string | null
@@ -214,7 +217,7 @@ export type Database = {
           id?: string
           is_billable?: boolean | null
           name: string
-          owner_id?: string | null
+          owner_id?: string
         }
         Update: {
           client_id?: string | null
@@ -222,7 +225,7 @@ export type Database = {
           id?: string
           is_billable?: boolean | null
           name?: string
-          owner_id?: string | null
+          owner_id?: string
         }
         Relationships: [
           {
@@ -240,7 +243,7 @@ export type Database = {
           created_at: string | null
           id: string
           invoice_id: string
-          owner_id: string | null
+          owner_id: string
           scheduled_at: string
           status: Database["public"]["Enums"]["reminder_status"]
         }
@@ -249,7 +252,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           invoice_id: string
-          owner_id?: string | null
+          owner_id?: string
           scheduled_at: string
           status?: Database["public"]["Enums"]["reminder_status"]
         }
@@ -258,7 +261,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           invoice_id?: string
-          owner_id?: string | null
+          owner_id?: string
           scheduled_at?: string
           status?: Database["public"]["Enums"]["reminder_status"]
         }
@@ -271,6 +274,81 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      savings_entries: {
+        Row: {
+          amount: number
+          created_at: string
+          goal_id: string
+          id: string
+          note: string | null
+          owner_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          goal_id: string
+          id?: string
+          note?: string | null
+          owner_id?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          goal_id?: string
+          id?: string
+          note?: string | null
+          owner_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "savings_entries_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "savings_goals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "savings_entries_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "savings_goals_v"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      savings_goals: {
+        Row: {
+          created_at: string | null
+          id: string
+          owner_id: string
+          saved_amount: number
+          target_amount: number
+          target_date: string | null
+          title: string
+          type: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          owner_id?: string
+          saved_amount?: number
+          target_amount: number
+          target_date?: string | null
+          title: string
+          type?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          owner_id?: string
+          saved_amount?: number
+          target_amount?: number
+          target_date?: string | null
+          title?: string
+          type?: string | null
+        }
+        Relationships: []
       }
       settings: {
         Row: {
@@ -326,7 +404,7 @@ export type Database = {
           is_billable: boolean | null
           linked_invoice_id: string | null
           notes: string | null
-          owner_id: string | null
+          owner_id: string
           project_id: string | null
           reminder_time: string | null
           status: Database["public"]["Enums"]["task_status"] | null
@@ -340,7 +418,7 @@ export type Database = {
           is_billable?: boolean | null
           linked_invoice_id?: string | null
           notes?: string | null
-          owner_id?: string | null
+          owner_id?: string
           project_id?: string | null
           reminder_time?: string | null
           status?: Database["public"]["Enums"]["task_status"] | null
@@ -354,7 +432,7 @@ export type Database = {
           is_billable?: boolean | null
           linked_invoice_id?: string | null
           notes?: string | null
-          owner_id?: string | null
+          owner_id?: string
           project_id?: string | null
           reminder_time?: string | null
           status?: Database["public"]["Enums"]["task_status"] | null
@@ -386,6 +464,51 @@ export type Database = {
       }
     }
     Views: {
+      reminders_view: {
+        Row: {
+          client_name: string | null
+          invoice_id: string | null
+          invoice_number: string | null
+          invoice_status: Database["public"]["Enums"]["invoice_status"] | null
+          method: Database["public"]["Enums"]["channel_type"] | null
+          outcome: string | null
+          reminder_id: string | null
+          sent_at: string | null
+          template_used: string | null
+          total_amount: number | null
+        }
+        Relationships: []
+      }
+      savings_goals_v: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          name: string | null
+          saved_amount: number | null
+          target_amount: number | null
+          target_date: string | null
+          type: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+          saved_amount?: number | null
+          target_amount?: number | null
+          target_date?: string | null
+          type?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+          saved_amount?: number | null
+          target_amount?: number | null
+          target_date?: string | null
+          type?: string | null
+        }
+        Relationships: []
+      }
       v_dashboard_metrics: {
         Row: {
           overdue_amount: number | null

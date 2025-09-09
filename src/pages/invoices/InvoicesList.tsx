@@ -30,6 +30,7 @@ import InvoicePreviewModal from "@/components/InvoicePreviewModal";
 import { FollowUpPreviewDrawer } from "@/components/FollowUpPreviewDrawer";
 import { sendReminderViaWhatsApp, sendReminderViaEmail } from "@/lib/reminderActions";
 import { buildInvoiceReminderText, buildInvoiceReminderEmail } from "@/services/payments";
+import { friendlyDeleteError } from "@/lib/supabaseErrors";
 
 const currency = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
@@ -54,33 +55,14 @@ export default function InvoicesList() {
   const [showReminderDrawer, setShowReminderDrawer] = useState(false);
   const [selectedReminderInvoice, setSelectedReminderInvoice] = useState<any>(null);
   const [composedMessage, setComposedMessage] = useState<{ message: string; upiIntent: string } | undefined>();
-  const [sentFlags, setSentFlags] = useState<Record<string, boolean>>({});
-
   const clientName = (id: string) => clients.find((c: any) => c.id === id)?.name || "Unknown";
 
-  // Load sent flags from localStorage on component mount
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('invoice_sent_flags');
-      if (stored) {
-        setSentFlags(JSON.parse(stored));
-      }
-    } catch (error) {
-      console.error('Error loading sent flags:', error);
-    }
-  }, []);
-
-  // Save sent flags to localStorage whenever they change
-  useEffect(() => {
-    try {
-      localStorage.setItem('invoice_sent_flags', JSON.stringify(sentFlags));
-    } catch (error) {
-      console.error('Error saving sent flags:', error);
-    }
-  }, [sentFlags]);
-
   const filteredInvoices = invoices.filter((invoice: any) => {
-    const matchesTab = activeTab === "all" || invoice.status === activeTab;
+    // Calculate if invoice is overdue for filtering
+    const isOverdue = invoice.status !== "paid" && getDaysOverdue(invoice.due_date, invoice.status) > 0;
+    const displayStatus = isOverdue ? "overdue" : invoice.status;
+    
+    const matchesTab = activeTab === "all" || displayStatus === activeTab;
     const searchLower = searchQuery.toLowerCase();
     const matchesSearch =
       !searchQuery ||
@@ -249,17 +231,24 @@ export default function InvoicesList() {
     }
   };
 
-  const toggleSentFlag = (invoiceId: string) => {
-    setSentFlags(prev => ({
-      ...prev,
-      [invoiceId]: !prev[invoiceId]
-    }));
-    
-    const isNowSent = !sentFlags[invoiceId];
-    toast({ 
-      title: isNowSent ? "Marked as sent" : "Unmarked as sent",
-      description: isNowSent ? "Invoice flagged as sent locally" : "Sent flag removed"
-    });
+  const handleMarkAsSent = async (invoice: any) => {
+    try {
+      await update_invoice(invoice.id, { status: "sent" });
+      await invalidateInvoiceCaches(queryClient);
+      toast({ title: "Invoice marked as sent" });
+    } catch {
+      toast({ title: "Error updating invoice", variant: "destructive" });
+    }
+  };
+
+  const handleUndoSent = async (invoice: any) => {
+    try {
+      await update_invoice(invoice.id, { status: "draft" });
+      await invalidateInvoiceCaches(queryClient);
+      toast({ title: "Invoice status reverted to draft" });
+    } catch {
+      toast({ title: "Error updating invoice", variant: "destructive" });
+    }
   };
 
   const handleCopyInvoice = async (invoice: any) => {
@@ -349,24 +338,18 @@ export default function InvoicesList() {
                 <TableBody>
                   {filteredInvoices.map((invoice: any) => {
                     const daysOverdue = getDaysOverdue(invoice.due_date, invoice.status);
-                    const isSentFlagged = sentFlags[invoice.id];
+                    const isOverdue = invoice.status !== "paid" && daysOverdue > 0;
+                    const displayStatus = isOverdue ? "overdue" : invoice.status;
 
                     return (
                       <TableRow key={invoice.id} data-testid={`invoice-row-${invoice.id}`}>
                         <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            {invoice.invoice_number}
-                            {isSentFlagged && (
-                              <Badge variant="secondary" className="text-xs">
-                                Sent
-                              </Badge>
-                            )}
-                          </div>
+                          {invoice.invoice_number}
                         </TableCell>
                         <TableCell>{clientName(invoice.client_id)}</TableCell>
                         <TableCell className="text-right">{currency(invoice.total_amount)}</TableCell>
                         <TableCell>
-                          <Badge variant={getStatusVariant(invoice.status)}>{invoice.status}</Badge>
+                          <Badge variant={getStatusVariant(displayStatus)}>{displayStatus}</Badge>
                         </TableCell>
                         <TableCell>{new Date(invoice.due_date).toLocaleDateString()}</TableCell>
                         <TableCell>
@@ -398,19 +381,26 @@ export default function InvoicesList() {
                                 Preview
                               </DropdownMenuItem>
 
-                              <DropdownMenuItem onClick={() => toggleSentFlag(invoice.id)}>
-                                {isSentFlagged ? (
-                                  <>
-                                    <Circle className="mr-2 h-4 w-4" />
-                                    Undo sent
-                                  </>
-                                ) : (
-                                  <>
-                                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                                    Mark as sent
-                                  </>
-                                )}
-                              </DropdownMenuItem>
+                              {invoice.status === "draft" && (
+                                <DropdownMenuItem onClick={() => handleMarkAsSent(invoice)}>
+                                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                                  Mark as sent
+                                </DropdownMenuItem>
+                              )}
+
+                              {invoice.status === "sent" && (
+                                <DropdownMenuItem onClick={() => handleUndoSent(invoice)}>
+                                  <Circle className="mr-2 h-4 w-4" />
+                                  Undo sent
+                                </DropdownMenuItem>
+                              )}
+
+                              {invoice.status === "paid" && (
+                                <DropdownMenuItem onClick={() => handleUndoSent(invoice)}>
+                                  <Circle className="mr-2 h-4 w-4" />
+                                  Undo paid
+                                </DropdownMenuItem>
+                              )}
 
                               <DropdownMenuItem onClick={() => handleCopyInvoice(invoice)}>
                                 <Copy className="mr-2 h-4 w-4" />

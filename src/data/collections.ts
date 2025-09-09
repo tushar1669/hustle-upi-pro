@@ -58,6 +58,12 @@ export async function update_client(id: string, changes: Partial<{ name: string;
   return data;
 }
 
+export async function delete_client(id: string) {
+  const { data, error } = await supabase.from("clients").delete().eq("id", id).select("*").single();
+  if (error) throw error;
+  return data;
+}
+
 // ============ Projects ============
 export async function projects_all() {
   const { data, error } = await supabase.from("projects").select("*");

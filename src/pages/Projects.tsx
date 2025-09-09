@@ -12,6 +12,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { projects_all, clients_all, delete_project } from "@/data/collections";
 import { CACHE_KEYS, invalidateProjectCaches } from "@/hooks/useCache";
+import { friendlyDeleteError } from "@/lib/supabaseErrors";
 
 const Projects = () => {
   const [showAddModal, setShowAddModal] = useState(false);
@@ -48,11 +49,10 @@ const Projects = () => {
       toast({ title: "Project deleted successfully" });
       setDeleteProject(null);
     } catch (error: any) {
+      const friendlyError = friendlyDeleteError(error, 'project');
       toast({
         title: "Error deleting project",
-        description: error?.message?.includes("foreign key") 
-          ? "Cannot delete project with existing tasks. Please reassign or delete tasks first."
-          : error?.message ?? "Something went wrong",
+        description: friendlyError || (error?.message ?? "Something went wrong"),
         variant: "destructive"
       });
     }

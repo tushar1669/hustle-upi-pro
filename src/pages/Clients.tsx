@@ -5,20 +5,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { Plus, Edit } from "lucide-react";
+import { Plus, Edit, Trash2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { clients_all, create_client } from "@/data/collections";
+import { clients_all, create_client, delete_client } from "@/data/collections";
 import { useToast } from "@/hooks/use-toast";
 import ClientEditModal from "@/components/ClientEditModal";
 import { validateIndianMobile } from "@/services/payments";
+import { friendlyDeleteError } from "@/lib/supabaseErrors";
 
 export default function Clients() {
   const { data: clients = [], refetch } = useQuery({ queryKey: ["clients_all"], queryFn: clients_all });
   const [isOpen, setIsOpen] = useState(false);
   const [editClient, setEditClient] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [deleteClient, setDeleteClient] = useState<any>(null);
   const [formData, setFormData] = useState({
     name: "",
     whatsapp: "",
@@ -144,6 +147,23 @@ export default function Clients() {
     setEditClient(null);
   };
 
+  const handleDelete = async (client: any) => {
+    try {
+      await delete_client(client.id);
+      await refetch();
+      queryClient.invalidateQueries({ queryKey: ["clients_all"] });
+      toast({ title: "Client deleted successfully" });
+      setDeleteClient(null);
+    } catch (error: any) {
+      const friendlyError = friendlyDeleteError(error, 'client');
+      toast({
+        title: "Error deleting client",
+        description: friendlyError || (error?.message ?? "Something went wrong"),
+        variant: "destructive"
+      });
+    }
+  };
+
   const isFormValid = Object.keys(errors).length === 0 && formData.name.trim();
 
   return (
@@ -254,15 +274,26 @@ export default function Clients() {
                   <TableCell>{c.gstin || "—"}</TableCell>
                   <TableCell>{c.upi_vpa || "—"}</TableCell>
                   <TableCell>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleEditClient(c)}
-                      data-testid="btn-client-edit"
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      Edit
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEditClient(c)}
+                        data-testid="btn-client-edit"
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setDeleteClient(c)}
+                        data-testid="btn-client-delete"
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -277,6 +308,23 @@ export default function Clients() {
         client={editClient}
         onSave={handleEditSave}
       />
+
+      <AlertDialog open={!!deleteClient} onOpenChange={() => setDeleteClient(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Client</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deleteClient?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => handleDelete(deleteClient)}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
