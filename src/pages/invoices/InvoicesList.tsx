@@ -8,8 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { useState } from "react";
-import { Plus, MoreHorizontal, Eye, Send, MessageSquare, Edit, DollarSign } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, MoreHorizontal, Eye, Send, MessageSquare, Edit, DollarSign, Copy, Share, CheckCircle2, Circle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -54,8 +54,30 @@ export default function InvoicesList() {
   const [showReminderDrawer, setShowReminderDrawer] = useState(false);
   const [selectedReminderInvoice, setSelectedReminderInvoice] = useState<any>(null);
   const [composedMessage, setComposedMessage] = useState<{ message: string; upiIntent: string } | undefined>();
+  const [sentFlags, setSentFlags] = useState<Record<string, boolean>>({});
 
   const clientName = (id: string) => clients.find((c: any) => c.id === id)?.name || "Unknown";
+
+  // Load sent flags from localStorage on component mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('invoice_sent_flags');
+      if (stored) {
+        setSentFlags(JSON.parse(stored));
+      }
+    } catch (error) {
+      console.error('Error loading sent flags:', error);
+    }
+  }, []);
+
+  // Save sent flags to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('invoice_sent_flags', JSON.stringify(sentFlags));
+    } catch (error) {
+      console.error('Error saving sent flags:', error);
+    }
+  }, [sentFlags]);
 
   const filteredInvoices = invoices.filter((invoice: any) => {
     const matchesTab = activeTab === "all" || invoice.status === activeTab;
@@ -227,6 +249,55 @@ export default function InvoicesList() {
     }
   };
 
+  const toggleSentFlag = (invoiceId: string) => {
+    setSentFlags(prev => ({
+      ...prev,
+      [invoiceId]: !prev[invoiceId]
+    }));
+    
+    const isNowSent = !sentFlags[invoiceId];
+    toast({ 
+      title: isNowSent ? "Marked as sent" : "Unmarked as sent",
+      description: isNowSent ? "Invoice flagged as sent locally" : "Sent flag removed"
+    });
+  };
+
+  const handleCopyInvoice = async (invoice: any) => {
+    try {
+      const client = clients.find((c: any) => c.id === invoice.client_id);
+      const text = `Invoice ${invoice.invoice_number}\nClient: ${client?.name || 'Unknown'}\nAmount: ${currency(invoice.total_amount)}\nDue: ${new Date(invoice.due_date).toLocaleDateString()}`;
+      
+      await navigator.clipboard.writeText(text);
+      toast({ title: "Invoice details copied to clipboard" });
+    } catch (error) {
+      toast({ 
+        title: "Failed to copy",
+        description: "Could not copy to clipboard",
+        variant: "destructive" 
+      });
+    }
+  };
+
+  const handleShareInvoice = async (invoice: any) => {
+    const client = clients.find((c: any) => c.id === invoice.client_id);
+    const text = `Invoice ${invoice.invoice_number}\nClient: ${client?.name || 'Unknown'}\nAmount: ${currency(invoice.total_amount)}\nDue: ${new Date(invoice.due_date).toLocaleDateString()}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Invoice ${invoice.invoice_number}`,
+          text: text
+        });
+      } catch (error) {
+        // User cancelled share or error occurred, fallback to copy
+        handleCopyInvoice(invoice);
+      }
+    } else {
+      // Fallback to copy
+      handleCopyInvoice(invoice);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <SEO title="HustleHub — Invoices" description="Manage all your invoices with filtering and search capabilities." />
@@ -278,10 +349,20 @@ export default function InvoicesList() {
                 <TableBody>
                   {filteredInvoices.map((invoice: any) => {
                     const daysOverdue = getDaysOverdue(invoice.due_date, invoice.status);
+                    const isSentFlagged = sentFlags[invoice.id];
 
                     return (
                       <TableRow key={invoice.id} data-testid={`invoice-row-${invoice.id}`}>
-                        <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            {invoice.invoice_number}
+                            {isSentFlagged && (
+                              <Badge variant="secondary" className="text-xs">
+                                Sent
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell>{clientName(invoice.client_id)}</TableCell>
                         <TableCell className="text-right">{currency(invoice.total_amount)}</TableCell>
                         <TableCell>
@@ -315,6 +396,30 @@ export default function InvoicesList() {
                               >
                                 <Eye className="mr-2 h-4 w-4" />
                                 Preview
+                              </DropdownMenuItem>
+
+                              <DropdownMenuItem onClick={() => toggleSentFlag(invoice.id)}>
+                                {isSentFlagged ? (
+                                  <>
+                                    <Circle className="mr-2 h-4 w-4" />
+                                    Undo sent
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                                    Mark as sent
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+
+                              <DropdownMenuItem onClick={() => handleCopyInvoice(invoice)}>
+                                <Copy className="mr-2 h-4 w-4" />
+                                Copy details
+                              </DropdownMenuItem>
+
+                              <DropdownMenuItem onClick={() => handleShareInvoice(invoice)}>
+                                <Share className="mr-2 h-4 w-4" />
+                                Share
                               </DropdownMenuItem>
 
                               {invoice.status !== "paid" && (

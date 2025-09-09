@@ -7,10 +7,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Clock, Send, MessageSquare, Mail, TrendingUp, Filter, Calendar, X, Search } from "lucide-react";
+import { Clock, Send, MessageSquare, Mail, TrendingUp, Filter, Calendar, X, Search, CalendarDays } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { 
   invoices_all, 
@@ -23,7 +25,8 @@ import {
   reminder_reschedule,
   message_log_insert,
   bulk_update_reminders,
-  create_message_log
+  create_message_log,
+  update_reminder
 } from "@/data/collections";
 import { sendReminderViaWhatsApp, sendReminderViaEmail } from "@/lib/reminderActions";
 import { useToast } from "@/hooks/use-toast";
@@ -84,6 +87,7 @@ export default function FollowUps() {
     bulkMode?: boolean;
   }>({ isOpen: false });
   const [quickFollowupModal, setQuickFollowupModal] = useState(false);
+  const [quickReschedulePopover, setQuickReschedulePopover] = useState<{ isOpen: boolean; reminder?: any }>({ isOpen: false });
 
   // Update URL when filters change
   useEffect(() => {
@@ -311,6 +315,59 @@ export default function FollowUps() {
       
       invalidateCaches();
       setRescheduleDialog({ isOpen: false });
+    } catch (error: any) {
+      toast({
+        title: "Error rescheduling reminder",
+        description: error?.message ?? "Something went wrong",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Quick reschedule handlers
+  const handleQuickReschedule = async (reminder: any, daysToAdd: number) => {
+    try {
+      const currentDate = new Date(reminder.scheduled_at);
+      const newDate = new Date(currentDate.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+      
+      await update_reminder(reminder.id, { scheduled_at: newDate.toISOString() });
+      invalidateCaches();
+      
+      const friendlyDate = newDate.toLocaleDateString('en-IN', { 
+        weekday: 'short', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+      
+      toast({ title: `Rescheduled to ${friendlyDate}` });
+      setQuickReschedulePopover({ isOpen: false });
+    } catch (error: any) {
+      toast({
+        title: "Error rescheduling reminder",
+        description: error?.message ?? "Something went wrong",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleQuickRescheduleCustom = async (reminder: any, dateString: string) => {
+    try {
+      const currentDate = new Date(reminder.scheduled_at);
+      const newDate = new Date(dateString);
+      // Keep the same time, just change the date
+      newDate.setHours(currentDate.getHours(), currentDate.getMinutes());
+      
+      await update_reminder(reminder.id, { scheduled_at: newDate.toISOString() });
+      invalidateCaches();
+      
+      const friendlyDate = newDate.toLocaleDateString('en-IN', { 
+        weekday: 'short', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+      
+      toast({ title: `Rescheduled to ${friendlyDate}` });
+      setQuickReschedulePopover({ isOpen: false });
     } catch (error: any) {
       toast({
         title: "Error rescheduling reminder",
@@ -793,13 +850,71 @@ export default function FollowUps() {
                                   )}
                                 </Tooltip>
                               )}
-                             <Button size="sm" variant="outline" onClick={() => handleSkip(reminder)}>
-                               Skip
-                             </Button>
-                             <Button size="sm" variant="outline" onClick={() => handleReschedule(reminder)}>
-                               <Calendar className="h-4 w-4 mr-1" />
-                               Reschedule
-                             </Button>
+                              <Button size="sm" variant="outline" onClick={() => handleSkip(reminder)}>
+                                Skip
+                              </Button>
+                              <Popover 
+                                open={quickReschedulePopover.isOpen && quickReschedulePopover.reminder?.id === reminder.id}
+                                onOpenChange={(open) => setQuickReschedulePopover({ 
+                                  isOpen: open, 
+                                  reminder: open ? reminder : undefined 
+                                })}
+                              >
+                                <PopoverTrigger asChild>
+                                  <Button size="sm" variant="outline">
+                                    <CalendarDays className="h-4 w-4 mr-1" />
+                                    Reschedule
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-64" align="end">
+                                  <div className="space-y-3">
+                                    <h4 className="font-medium">Quick Reschedule</h4>
+                                    <div className="grid grid-cols-1 gap-2">
+                                      <Button 
+                                        size="sm" 
+                                        variant="outline" 
+                                        onClick={() => handleQuickReschedule(reminder, 1)}
+                                      >
+                                        +1 day
+                                      </Button>
+                                      <Button 
+                                        size="sm" 
+                                        variant="outline" 
+                                        onClick={() => handleQuickReschedule(reminder, 3)}
+                                      >
+                                        +3 days
+                                      </Button>
+                                      <Button 
+                                        size="sm" 
+                                        variant="outline" 
+                                        onClick={() => handleQuickReschedule(reminder, 7)}
+                                      >
+                                        +7 days
+                                      </Button>
+                                    </div>
+                                    <div className="pt-2 border-t">
+                                      <Label htmlFor="custom-date" className="text-sm font-medium">
+                                        Pick date:
+                                      </Label>
+                                      <Input
+                                        id="custom-date"
+                                        type="date"
+                                        min={new Date().toISOString().split('T')[0]}
+                                        onChange={(e) => {
+                                          if (e.target.value) {
+                                            handleQuickRescheduleCustom(reminder, e.target.value);
+                                          }
+                                        }}
+                                        className="mt-1"
+                                      />
+                                    </div>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              <Button size="sm" variant="outline" onClick={() => handleReschedule(reminder)}>
+                                <Calendar className="h-4 w-4 mr-1" />
+                                Advanced
+                              </Button>
                            </>
                          )}
                        </div>

@@ -26,6 +26,7 @@ export default function Clients() {
     gstin: "",
     upi_vpa: ""
   });
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [phoneError, setPhoneError] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -38,12 +39,66 @@ export default function Clients() {
     }
   }, [location.state]);
 
+  const validateField = (name: string, value: string) => {
+    const newErrors = { ...errors };
+
+    switch (name) {
+      case 'email':
+        if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+          newErrors.email = 'Enter a valid email';
+        } else {
+          delete newErrors.email;
+        }
+        break;
+      case 'whatsapp':
+        if (value) {
+          const phoneValidation = validateIndianMobile(value);
+          if (!phoneValidation.valid) {
+            newErrors.whatsapp = 'Enter a valid phone number';
+          } else {
+            delete newErrors.whatsapp;
+          }
+        } else {
+          delete newErrors.whatsapp;
+        }
+        break;
+      case 'upi_vpa':
+        if (value && !/^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/.test(value)) {
+          newErrors.upi_vpa = 'Enter a valid UPI ID (e.g., name@bank)';
+        } else {
+          delete newErrors.upi_vpa;
+        }
+        break;
+    }
+
+    setErrors(newErrors);
+  };
+
+  const handleInputChange = (name: string, value: string) => {
+    setFormData({ ...formData, [name]: value });
+    validateField(name, value);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate phone number
+    // Validate all fields before submission
+    Object.entries(formData).forEach(([name, value]) => {
+      validateField(name, value);
+    });
+
+    // Check if there are any validation errors
+    if (Object.keys(errors).length > 0) {
+      toast({ 
+        title: "Please fix validation errors", 
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    // Also check phone validation separately (legacy)
     const phoneValidation = validateIndianMobile(formData.whatsapp);
-    if (!phoneValidation.valid) {
+    if (formData.whatsapp && !phoneValidation.valid) {
       setPhoneError(phoneValidation.error || "Invalid phone number");
       return;
     }
@@ -54,17 +109,22 @@ export default function Clients() {
       queryClient.invalidateQueries({ queryKey: ["clients_all"] });
       setIsOpen(false);
       setFormData({ name: "", whatsapp: "", email: "", gstin: "", upi_vpa: "" });
+      setErrors({});
       setPhoneError("");
       toast({ title: "Client created successfully" });
-    } catch (error) {
-      toast({ title: "Error creating client", variant: "destructive" });
+    } catch (error: any) {
+      toast({
+        title: "Error creating client",
+        description: error?.message ?? "Something went wrong",
+        variant: "destructive"
+      });
     }
   };
 
   const handleWhatsAppChange = (value: string) => {
-    setFormData({ ...formData, whatsapp: value });
+    handleInputChange('whatsapp', value);
     if (phoneError) {
-      // Clear error when user starts typing
+      // Clear legacy error when user starts typing
       const validation = validateIndianMobile(value);
       if (validation.valid) {
         setPhoneError("");
@@ -83,6 +143,8 @@ export default function Clients() {
     setIsEditModalOpen(false);
     setEditClient(null);
   };
+
+  const isFormValid = Object.keys(errors).length === 0 && formData.name.trim();
 
   return (
     <div className="space-y-6">
@@ -107,7 +169,7 @@ export default function Clients() {
                 <Input
                   id="name"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => handleInputChange('name', e.target.value)}
                   required
                 />
               </div>
@@ -119,8 +181,8 @@ export default function Clients() {
                   onChange={(e) => handleWhatsAppChange(e.target.value)}
                   placeholder="e.g., 9876543210 or +91 98765 43210"
                 />
-                {phoneError && (
-                  <p className="text-sm text-destructive mt-1">{phoneError}</p>
+                {(phoneError || errors.whatsapp) && (
+                  <p className="text-sm text-destructive mt-1">{phoneError || errors.whatsapp}</p>
                 )}
                 <p className="text-xs text-muted-foreground mt-1">
                   Enter 10-digit Indian mobile number starting with 6-9
@@ -132,15 +194,18 @@ export default function Clients() {
                   id="email"
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
                 />
+                {errors.email && (
+                  <p className="text-sm text-destructive mt-1">{errors.email}</p>
+                )}
               </div>
               <div>
                 <Label htmlFor="gstin">GSTIN</Label>
                 <Input
                   id="gstin"
                   value={formData.gstin}
-                  onChange={(e) => setFormData({ ...formData, gstin: e.target.value })}
+                  onChange={(e) => handleInputChange('gstin', e.target.value)}
                 />
               </div>
               <div>
@@ -148,14 +213,18 @@ export default function Clients() {
                 <Input
                   id="upi_vpa"
                   value={formData.upi_vpa}
-                  onChange={(e) => setFormData({ ...formData, upi_vpa: e.target.value })}
+                  onChange={(e) => handleInputChange('upi_vpa', e.target.value)}
+                  placeholder="e.g., name@bank"
                 />
+                {errors.upi_vpa && (
+                  <p className="text-sm text-destructive mt-1">{errors.upi_vpa}</p>
+                )}
               </div>
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" data-testid="btn-client-add-submit">Create Client</Button>
+                <Button type="submit" data-testid="btn-client-add-submit" disabled={!isFormValid}>Create Client</Button>
               </div>
             </form>
           </DialogContent>

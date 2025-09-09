@@ -43,21 +43,21 @@ export default function EditClientModal({ isOpen, onClose, client, onSave }: Edi
     switch (name) {
       case 'email':
         if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-          newErrors.email = 'Please enter a valid email address';
+          newErrors.email = 'Enter a valid email';
         } else {
           delete newErrors.email;
         }
         break;
       case 'whatsapp':
         if (value && !/^(\+91|0)?[6-9]\d{9}$/.test(value.replace(/\s/g, ''))) {
-          newErrors.whatsapp = 'Please enter a valid Indian phone number';
+          newErrors.whatsapp = 'Enter a valid phone number';
         } else {
           delete newErrors.whatsapp;
         }
         break;
       case 'upi_vpa':
-        if (value && !/^[-_.a-zA-Z0-9]{2,256}@[a-zA-Z]{2,64}$/.test(value)) {
-          newErrors.upi_vpa = 'Please enter a valid UPI VPA (e.g., user@paytm)';
+        if (value && !/^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/.test(value)) {
+          newErrors.upi_vpa = 'Enter a valid UPI ID (e.g., name@bank)';
         } else {
           delete newErrors.upi_vpa;
         }
@@ -91,7 +91,11 @@ export default function EditClientModal({ isOpen, onClose, client, onSave }: Edi
       onClose();
       toast({ title: "Client updated successfully" });
     } catch (error: any) {
-      toast({ title: "Error updating client", description: error.message, variant: "destructive" });
+      toast({
+        title: "Error updating client",
+        description: error?.message ?? "Something went wrong",
+        variant: "destructive"
+      });
     }
   };
 
