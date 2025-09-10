@@ -251,6 +251,16 @@ export default function InvoicesList() {
     }
   };
 
+  const handleUndoPaid = async (invoice: any) => {
+    try {
+      await update_invoice(invoice.id, { status: "draft", paid_date: null });
+      await invalidateInvoiceCaches(queryClient);
+      toast({ title: "Invoice status reverted to draft" });
+    } catch {
+      toast({ title: "Error updating invoice", variant: "destructive" });
+    }
+  };
+
   const handleCopyInvoice = async (invoice: any) => {
     try {
       const client = clients.find((c: any) => c.id === invoice.client_id);
@@ -395,12 +405,12 @@ export default function InvoicesList() {
                                 </DropdownMenuItem>
                               )}
 
-                              {invoice.status === "paid" && (
-                                <DropdownMenuItem onClick={() => handleUndoSent(invoice)}>
-                                  <Circle className="mr-2 h-4 w-4" />
-                                  Undo paid
-                                </DropdownMenuItem>
-                              )}
+                {invoice.status === "paid" && (
+                  <DropdownMenuItem onClick={() => handleUndoPaid(invoice)}>
+                    <Circle className="mr-2 h-4 w-4" />
+                    Undo paid
+                  </DropdownMenuItem>
+                )}
 
                               <DropdownMenuItem onClick={() => handleCopyInvoice(invoice)}>
                                 <Copy className="mr-2 h-4 w-4" />

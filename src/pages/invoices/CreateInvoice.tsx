@@ -86,23 +86,28 @@ export default function CreateInvoice() {
   const selectedClient = clients.find((c: any) => c.id === clientId);
   const filteredProjects = projects.filter((p: any) => p.client_id === clientId);
 
-  const invoiceNumber = useMemo(() => {
+  const generateInvoiceNumber = () => {
     if (!settings) return "";
     const year = new Date().getFullYear();
-    const lastInvoice = invoices
-      .filter((inv: any) => inv.invoice_number?.startsWith(settings.invoice_prefix))
-      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+    const yearPrefix = `${settings.invoice_prefix}-${year}-`;
     
-    let nextNumber = 1;
-    if (lastInvoice?.invoice_number) {
-      const match = lastInvoice.invoice_number.match(/(\d{4})$/);
+    // Find max sequence number for current year
+    const yearInvoices = invoices.filter((inv: any) => 
+      inv.invoice_number?.startsWith(yearPrefix)
+    );
+    
+    let maxNumber = 0;
+    yearInvoices.forEach((inv: any) => {
+      const match = inv.invoice_number?.match(/(\d{4})$/);
       if (match) {
-        nextNumber = parseInt(match[1]) + 1;
+        maxNumber = Math.max(maxNumber, parseInt(match[1]));
       }
-    }
+    });
     
-    return `${settings.invoice_prefix}-${year}-${nextNumber.toString().padStart(4, "0")}`;
-  }, [settings, invoices]);
+    return `${yearPrefix}${(maxNumber + 1).toString().padStart(4, "0")}`;
+  };
+
+  const invoiceNumber = useMemo(() => generateInvoiceNumber(), [settings, invoices]);
 
   const subtotal = lineItems.reduce((sum, item) => sum + item.amount, 0);
   const gstAmount = gstEnabled && settings ? subtotal * (settings.default_gst_percent / 100) : 0;
@@ -172,7 +177,15 @@ export default function CreateInvoice() {
 
   const saveDraft = async () => {
     // Check for demo mode or no session
-    if (isDemoMode || !session) {
+    if (isDemoMode) {
+      toast({ 
+        title: "Demo mode: saving is disabled",
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    if (!session) {
       toast({ 
         title: "Sign in required", 
         description: "Please sign in to save invoices",
@@ -197,19 +210,39 @@ export default function CreateInvoice() {
     }
     
     try {
-      const invoiceData = {
-        invoice_number: invoiceNumber,
-        client_id: clientId,
-        project_id: projectId || null,
-        issue_date: new Date().toISOString(),
-        due_date: new Date(dueDate).toISOString(),
-        subtotal,
-        gst_amount: gstAmount,
-        total_amount: totalAmount,
-        status: "draft" as const
-      };
+      // Collision-safe invoice creation with retry logic
+      let invoice;
+      let attempts = 0;
+      const maxAttempts = 10;
+      
+      while (attempts < maxAttempts) {
+        try {
+          const invoiceData = {
+            invoice_number: generateInvoiceNumber(),
+            client_id: clientId,
+            project_id: projectId || null,
+            issue_date: new Date().toISOString(),
+            due_date: new Date(dueDate).toISOString(),
+            subtotal,
+            gst_amount: gstAmount,
+            total_amount: totalAmount,
+            status: "draft" as const
+          };
 
-      const invoice = await create_invoice(invoiceData);
+          invoice = await create_invoice(invoiceData);
+          break; // Success, exit retry loop
+        } catch (error: any) {
+          if (error?.code === '23505' && error?.message?.includes('invoice_number')) {
+            // Unique violation on invoice number, retry with incremented number
+            attempts++;
+            if (attempts >= maxAttempts) {
+              throw new Error("Unable to generate unique invoice number after multiple attempts");
+            }
+            continue;
+          }
+          throw error; // Re-throw other errors
+        }
+      }
       
       // Create line items
       for (const item of lineItems) {
@@ -249,7 +282,15 @@ export default function CreateInvoice() {
 
   const sendInvoice = async () => {
     // Check for demo mode or no session
-    if (isDemoMode || !session) {
+    if (isDemoMode) {
+      toast({ 
+        title: "Demo mode: saving is disabled",
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    if (!session) {
       toast({ 
         title: "Sign in required", 
         description: "Please sign in to send invoices",
@@ -274,19 +315,39 @@ export default function CreateInvoice() {
     }
     
     try {
-      const invoiceData = {
-        invoice_number: invoiceNumber,
-        client_id: clientId,
-        project_id: projectId || null,
-        issue_date: new Date().toISOString(),
-        due_date: new Date(dueDate).toISOString(),
-        subtotal,
-        gst_amount: gstAmount,
-        total_amount: totalAmount,
-        status: "sent" as const
-      };
+      // Collision-safe invoice creation with retry logic
+      let invoice;
+      let attempts = 0;
+      const maxAttempts = 10;
+      
+      while (attempts < maxAttempts) {
+        try {
+          const invoiceData = {
+            invoice_number: generateInvoiceNumber(),
+            client_id: clientId,
+            project_id: projectId || null,
+            issue_date: new Date().toISOString(),
+            due_date: new Date(dueDate).toISOString(),
+            subtotal,
+            gst_amount: gstAmount,
+            total_amount: totalAmount,
+            status: "sent" as const
+          };
 
-      const invoice = await create_invoice(invoiceData);
+          invoice = await create_invoice(invoiceData);
+          break; // Success, exit retry loop
+        } catch (error: any) {
+          if (error?.code === '23505' && error?.message?.includes('invoice_number')) {
+            // Unique violation on invoice number, retry with incremented number
+            attempts++;
+            if (attempts >= maxAttempts) {
+              throw new Error("Unable to generate unique invoice number after multiple attempts");
+            }
+            continue;
+          }
+          throw error; // Re-throw other errors
+        }
+      }
       
       // Create line items
       for (const item of lineItems) {
@@ -407,7 +468,7 @@ export default function CreateInvoice() {
             variant="outline" 
             onClick={saveDraft}
             disabled={isDemoMode || !session}
-            title={isDemoMode || !session ? "Sign in to save invoices" : ""}
+            title={isDemoMode ? "Demo mode: saving is disabled" : !session ? "Sign in to save invoices" : ""}
           >
             <FileText className="h-4 w-4 mr-2" />
             Save Draft
@@ -416,7 +477,7 @@ export default function CreateInvoice() {
             onClick={sendInvoice} 
             variant="gradient"
             disabled={isDemoMode || !session}
-            title={isDemoMode || !session ? "Sign in to send invoices" : ""}
+            title={isDemoMode ? "Demo mode: saving is disabled" : !session ? "Sign in to send invoices" : ""}
           >
             <Send className="h-4 w-4 mr-2" />
             Save & Send
