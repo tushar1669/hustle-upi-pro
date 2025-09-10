@@ -1,13 +1,9 @@
-export function friendlyDeleteError(e: any, entity: 'client' | 'project' | 'invoice'): string | null {
-  const code = e?.code || e?.status || '';
-  const msg = (e?.message || '').toLowerCase();
-  const isFK = code === '23503' || msg.includes('foreign key') || msg.includes('violates foreign key');
-  
-  if (!isFK) return null;
-
-  if (entity === 'client') return 'Cannot delete: this client has related projects/invoices/reminders.';
-  if (entity === 'project') return 'Cannot delete: this project still has tasks.';
-  if (entity === 'invoice') return 'Cannot delete: this invoice has reminders or message history.';
-  
-  return null;
+export function friendlyDeleteError(error: any, entity: "client" | "project" | "invoice") {
+  const msg = error?.message?.toLowerCase() || "";
+  if (msg.includes("foreign key") || msg.includes("violates foreign key")) {
+    if (entity === "project") return "Cannot delete a project that has tasks. Reassign or delete tasks first.";
+    if (entity === "client")  return "Cannot delete a client that has projects or invoices. Move or delete those first.";
+    if (entity === "invoice") return "Cannot delete an invoice that has reminders/logs linked.";
+  }
+  return "";
 }

@@ -21,7 +21,7 @@ interface AddTaskModalProps {
 export default function AddTaskModal({ isOpen, onClose, onSuccess }: AddTaskModalProps) {
   const [formData, setFormData] = useState({
     title: "",
-    project_id: "",
+    project_id: "none",
     due_date: "",
     is_billable: false,
     notes: ""
@@ -37,7 +37,7 @@ export default function AddTaskModal({ isOpen, onClose, onSuccess }: AddTaskModa
     try {
       const task = await create_task({
         title: formData.title,
-        project_id: formData.project_id || null,
+        project_id: formData.project_id === "none" ? null : formData.project_id || null,
         due_date: formData.due_date || null,
         is_billable: formData.is_billable,
         status: "open",
@@ -55,7 +55,7 @@ export default function AddTaskModal({ isOpen, onClose, onSuccess }: AddTaskModa
 
       // Success actions
       onSuccess();
-      setFormData({ title: "", project_id: "", due_date: "", is_billable: false, notes: "" });
+      setFormData({ title: "", project_id: "none", due_date: "", is_billable: false, notes: "" });
       onClose();
       toast({ title: "Task created successfully" });
     } catch (error: any) {
@@ -93,7 +93,7 @@ export default function AddTaskModal({ isOpen, onClose, onSuccess }: AddTaskModa
                 <SelectValue placeholder="Select project (optional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No project</SelectItem>
+                <SelectItem value="none">No project</SelectItem>
                 {projects.map((project: any) => (
                   <SelectItem key={project.id} value={project.id}>
                     {project.name}

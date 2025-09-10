@@ -88,7 +88,7 @@ function TaskEditModal({
       setTitle(task.title || "");
       setDueDate(task.due_date ? task.due_date.split("T")[0] : "");
       setIsBillable(!!task.is_billable);
-      setProjectId(task.project_id || "");
+      setProjectId(task.project_id || "none");
     }
   }, [task]);
 
@@ -98,7 +98,7 @@ function TaskEditModal({
     try {
       await update_task(task.id, {
         title,
-        project_id: projectId || null,
+        project_id: projectId === "none" ? null : projectId || null,
         due_date: dueDate ? new Date(dueDate).toISOString() : null,
         is_billable: isBillable,
       } as any);
@@ -144,7 +144,7 @@ function TaskEditModal({
                 <SelectValue placeholder="Select project (optional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No project</SelectItem>
+                <SelectItem value="none">No project</SelectItem>
                 {(projects as ProjectItem[]).map((project) => (
                   <SelectItem key={project.id} value={project.id}>
                     {project.name}

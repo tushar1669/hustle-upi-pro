@@ -30,6 +30,8 @@ import AddClientModal from "@/components/AddClientModal";
 import AddProjectModal from "@/components/AddProjectModal";
 import { CACHE_KEYS, invalidateInvoiceCaches } from "@/hooks/useCache";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useAuth } from "@/contexts/AuthContext";
+import { isDemoMode } from "@/integrations/supabase/client";
 
 const currency = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
@@ -46,6 +48,7 @@ export default function CreateInvoice() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { celebrate } = useCelebrationContext();
+  const { session } = useAuth();
 
   const { data: settings, isLoading: settingsLoading, error: settingsError } = useQuery({ 
     queryKey: CACHE_KEYS.SETTINGS, 
@@ -168,6 +171,16 @@ export default function CreateInvoice() {
   };
 
   const saveDraft = async () => {
+    // Check for demo mode or no session
+    if (isDemoMode || !session) {
+      toast({ 
+        title: "Sign in required", 
+        description: "Please sign in to save invoices",
+        variant: "destructive" 
+      });
+      return;
+    }
+
     if (!clientId) {
       toast({ title: "Please select a client", variant: "destructive" });
       return;
@@ -224,14 +237,27 @@ export default function CreateInvoice() {
       ]);
       toast({ title: "Draft saved successfully" });
       navigate("/invoices");
-    } catch (error) {
+    } catch (error: any) {
       console.error('Save draft error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast({ title: `Error saving draft: ${errorMessage}`, variant: "destructive" });
+      toast({ 
+        title: "Error saving invoice", 
+        description: error?.message ?? "Something went wrong", 
+        variant: "destructive" 
+      });
     }
   };
 
   const sendInvoice = async () => {
+    // Check for demo mode or no session
+    if (isDemoMode || !session) {
+      toast({ 
+        title: "Sign in required", 
+        description: "Please sign in to send invoices",
+        variant: "destructive" 
+      });
+      return;
+    }
+
     if (!clientId) {
       toast({ title: "Please select a client", variant: "destructive" });
       return;
@@ -317,10 +343,13 @@ export default function CreateInvoice() {
       toast({ title: "Invoice sent successfully" });
       celebrate('invoice_sent');
       navigate("/invoices");
-    } catch (error) {
+    } catch (error: any) {
       console.error('Send invoice error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast({ title: `Error sending invoice: ${errorMessage}`, variant: "destructive" });
+      toast({ 
+        title: "Error saving invoice", 
+        description: error?.message ?? "Something went wrong", 
+        variant: "destructive" 
+      });
     }
   };
 
@@ -374,11 +403,21 @@ export default function CreateInvoice() {
         <h1 className="text-2xl font-semibold">Create Invoice</h1>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => navigate("/invoices")}>Cancel</Button>
-          <Button variant="outline" onClick={saveDraft}>
+          <Button 
+            variant="outline" 
+            onClick={saveDraft}
+            disabled={isDemoMode || !session}
+            title={isDemoMode || !session ? "Sign in to save invoices" : ""}
+          >
             <FileText className="h-4 w-4 mr-2" />
             Save Draft
           </Button>
-          <Button onClick={sendInvoice} variant="gradient">
+          <Button 
+            onClick={sendInvoice} 
+            variant="gradient"
+            disabled={isDemoMode || !session}
+            title={isDemoMode || !session ? "Sign in to send invoices" : ""}
+          >
             <Send className="h-4 w-4 mr-2" />
             Save & Send
           </Button>
