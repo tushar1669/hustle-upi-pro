@@ -86,28 +86,16 @@ export default function CreateInvoice() {
   const selectedClient = clients.find((c: any) => c.id === clientId);
   const filteredProjects = projects.filter((p: any) => p.client_id === clientId);
 
-  const generateInvoiceNumber = () => {
+  const invoiceNumber = useMemo(() => {
     if (!settings) return "";
     const year = new Date().getFullYear();
-    const yearPrefix = `${settings.invoice_prefix}-${year}-`;
-    
-    // Find max sequence number for current year
-    const yearInvoices = invoices.filter((inv: any) => 
-      inv.invoice_number?.startsWith(yearPrefix)
-    );
-    
-    let maxNumber = 0;
-    yearInvoices.forEach((inv: any) => {
-      const match = inv.invoice_number?.match(/(\d{4})$/);
-      if (match) {
-        maxNumber = Math.max(maxNumber, parseInt(match[1]));
-      }
-    });
-    
-    return `${yearPrefix}${(maxNumber + 1).toString().padStart(4, "0")}`;
-  };
-
-  const invoiceNumber = useMemo(() => generateInvoiceNumber(), [settings, invoices]);
+    const prefix = `${settings.invoice_prefix}-${year}-`;
+    const maxSeq = (invoices ?? [])
+      .filter((inv:any) => inv.invoice_number?.startsWith(prefix))
+      .map((inv:any) => { const m = inv.invoice_number?.match(/(\d{4})$/); return m ? parseInt(m[1]) : 0; })
+      .reduce((max:number, n:number) => (n>max?n:max), 0);
+    return `${prefix}${String(maxSeq + 1).padStart(4,'0')}`;
+  }, [settings, invoices]);
 
   const subtotal = lineItems.reduce((sum, item) => sum + item.amount, 0);
   const gstAmount = gstEnabled && settings ? subtotal * (settings.default_gst_percent / 100) : 0;
@@ -218,7 +206,7 @@ export default function CreateInvoice() {
       while (attempts < maxAttempts) {
         try {
           const invoiceData = {
-            invoice_number: generateInvoiceNumber(),
+            invoice_number: invoiceNumber,
             client_id: clientId,
             project_id: projectId || null,
             issue_date: new Date().toISOString(),
@@ -323,7 +311,7 @@ export default function CreateInvoice() {
       while (attempts < maxAttempts) {
         try {
           const invoiceData = {
-            invoice_number: generateInvoiceNumber(),
+            invoice_number: invoiceNumber,
             client_id: clientId,
             project_id: projectId || null,
             issue_date: new Date().toISOString(),
