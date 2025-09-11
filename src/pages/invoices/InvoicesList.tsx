@@ -57,6 +57,15 @@ export default function InvoicesList() {
   const [composedMessage, setComposedMessage] = useState<{ message: string; upiIntent: string } | undefined>();
   const clientName = (id: string) => clients.find((c: any) => c.id === id)?.name || "Unknown";
 
+  // Hoisted function to avoid TDZ issues
+  function getDaysOverdue(dueDate?: string | null, status?: string) {
+    if (!dueDate || status === "paid") return 0;
+    const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const today = startOf(new Date());
+    const due = startOf(new Date(dueDate));
+    return Math.floor((today - due) / (1000 * 60 * 60 * 24));
+  }
+
   const filteredInvoices = invoices.filter((invoice: any) => {
     // Calculate if invoice is overdue for filtering
     const isOverdue = invoice.status !== "paid" && getDaysOverdue(invoice.due_date, invoice.status) > 0;
@@ -86,14 +95,6 @@ export default function InvoicesList() {
     }
   };
 
-  const getDaysOverdue = (due_date: string, status: string) => {
-    if (status === "paid") return 0;
-    const today = new Date();
-    const dueDate = new Date(due_date);
-    const diffTime = today.getTime() - dueDate.getTime();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    // Positive => overdue, negative => days left
-  };
 
   const handleMarkPaid = async () => {
     if (!selectedInvoice || !paidDate) return;
