@@ -99,7 +99,7 @@ export async function delete_project(id: string) {
 export async function invoices_all() {
   const { data, error } = await supabase
     .from("invoices")
-    .select("id, invoice_number, client_id, total_amount, status, issue_date, due_date, created_at, paid_date")
+    .select("id, invoice_number, client_id, total_amount, status, issue_date, due_date, created_at, paid_at")
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data || [];
@@ -143,7 +143,7 @@ export async function update_invoice(id: string, changes: Partial<{
   total_amount: number;
   status: "draft" | "sent" | "overdue" | "paid";
   notes?: string | null;
-  paid_date?: string | null;
+  paid_at?: string | null;
   utr_reference?: string | null;
 }>) {
   const { data, error } = await supabase.from("invoices").update(changes).eq("id", id).select("*").single();

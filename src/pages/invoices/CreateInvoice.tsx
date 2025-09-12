@@ -272,7 +272,7 @@ export default function CreateInvoice() {
     // Check for demo mode or no session
     if (isDemoMode) {
       toast({ 
-        title: "Demo mode: saving is disabled",
+        title: "Demo mode: sending is disabled",
         variant: "destructive" 
       });
       return;

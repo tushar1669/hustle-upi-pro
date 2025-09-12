@@ -141,8 +141,8 @@ export default function FollowUps() {
   const paidAfterReminder = recentReminders.filter((reminder: any) => {
     const invoice = invoices.find((i: any) => i.id === reminder.related_id);
     return invoice?.status === "paid" && 
-           invoice.paid_date && 
-           new Date(invoice.paid_date) <= new Date(new Date(reminder.sent_at).getTime() + 7 * 24 * 60 * 60 * 1000);
+           invoice.paid_at && 
+           new Date(invoice.paid_at) <= new Date(new Date(reminder.sent_at).getTime() + 7 * 24 * 60 * 60 * 1000);
   }).length;
   const responseRate = sentThisWeek > 0 ? 
     Math.round((paidAfterReminder / sentThisWeek) * 100) : 0;

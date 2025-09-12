@@ -31,6 +31,8 @@ import { FollowUpPreviewDrawer } from "@/components/FollowUpPreviewDrawer";
 import { sendReminderViaWhatsApp, sendReminderViaEmail } from "@/lib/reminderActions";
 import { buildInvoiceReminderText, buildInvoiceReminderEmail } from "@/services/payments";
 import { friendlyDeleteError } from "@/lib/supabaseErrors";
+import { useAuth } from "@/contexts/AuthContext";
+import { isDemoMode } from "@/integrations/supabase/client";
 
 const currency = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
@@ -38,6 +40,7 @@ export default function InvoicesList() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { session } = useAuth();
 
   const { data: invoices = [] } = useQuery({ queryKey: ["invoices_all"], queryFn: invoices_all });
   const { data: clients = [] } = useQuery({ queryKey: ["clients_all"], queryFn: clients_all });
@@ -99,10 +102,28 @@ export default function InvoicesList() {
   const handleMarkPaid = async () => {
     if (!selectedInvoice || !paidDate) return;
 
+    // Check for demo mode or no session
+    if (isDemoMode) {
+      toast({ 
+        title: "Demo mode: updates are disabled",
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    if (!session) {
+      toast({ 
+        title: "Sign in required", 
+        description: "Please sign in to update invoices",
+        variant: "destructive" 
+      });
+      return;
+    }
+
     try {
       await update_invoice(selectedInvoice.id, {
         status: "paid",
-        paid_date: new Date(paidDate).toISOString(),
+        paid_at: new Date(paidDate).toISOString(),
         utr_reference: utrReference || null,
       });
 
@@ -123,8 +144,12 @@ export default function InvoicesList() {
 
       toast({ title: "Invoice marked as paid" });
       celebrate("mark_paid");
-    } catch {
-      toast({ title: "Error updating invoice", variant: "destructive" });
+    } catch (error: any) {
+      toast({ 
+        title: "Error updating invoice", 
+        description: error?.message ?? "Something went wrong", 
+        variant: "destructive" 
+      });
     }
   };
 
@@ -254,11 +279,15 @@ export default function InvoicesList() {
 
   const handleUndoPaid = async (invoice: any) => {
     try {
-      await update_invoice(invoice.id, { status: "draft", paid_date: null });
+      await update_invoice(invoice.id, { status: "draft", paid_at: null });
       await invalidateInvoiceCaches(queryClient);
       toast({ title: "Invoice status reverted to draft" });
-    } catch {
-      toast({ title: "Error updating invoice", variant: "destructive" });
+    } catch (error: any) {
+      toast({ 
+        title: "Error updating invoice", 
+        description: error?.message ?? "Something went wrong", 
+        variant: "destructive" 
+      });
     }
   };
 
@@ -425,11 +454,12 @@ export default function InvoicesList() {
 
                               {invoice.status !== "paid" && (
                                 <DropdownMenuItem
-                                  onClick={() => {
-                                    setSelectedInvoice(invoice);
-                                    setPaidDate(new Date().toISOString().split("T")[0]);
-                                    setShowMarkPaidModal(true);
-                                  }}
+                                   onClick={() => {
+                                     setSelectedInvoice(invoice);
+                                     setPaidDate(new Date().toISOString().split("T")[0]);
+                                     setShowMarkPaidModal(true);
+                                   }}
+                                   disabled={isDemoMode || !session}
                                 >
                                   <DollarSign className="mr-2 h-4 w-4" />
                                   Mark as Paid
@@ -501,7 +531,11 @@ export default function InvoicesList() {
               <Button variant="outline" onClick={() => setShowMarkPaidModal(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleMarkPaid} disabled={!paidDate}>
+              <Button 
+                onClick={handleMarkPaid} 
+                disabled={!paidDate || isDemoMode || !session}
+                title={isDemoMode ? "Demo mode: updates are disabled" : !session ? "Sign in to update invoices" : ""}
+              >
                 Mark as Paid
               </Button>
             </div>
