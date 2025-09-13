@@ -344,14 +344,14 @@ export default function InvoicesList() {
           <CardTitle>All Invoices</CardTitle>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full" data-testid="invoice-tabs">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
               <TabsList>
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="draft">Draft</TabsTrigger>
-                <TabsTrigger value="sent">Sent</TabsTrigger>
-                <TabsTrigger value="overdue">Overdue</TabsTrigger>
-                <TabsTrigger value="paid">Paid</TabsTrigger>
+                <TabsTrigger value="all" data-testid="tab-all">All</TabsTrigger>
+                <TabsTrigger value="draft" data-testid="tab-draft">Draft</TabsTrigger>
+                <TabsTrigger value="sent" data-testid="tab-sent">Sent</TabsTrigger>
+                <TabsTrigger value="overdue" data-testid="tab-overdue">Overdue</TabsTrigger>
+                <TabsTrigger value="paid" data-testid="tab-paid">Paid</TabsTrigger>
               </TabsList>
 
               <Input
@@ -454,6 +454,7 @@ export default function InvoicesList() {
 
                               {invoice.status !== "paid" && (
                                 <DropdownMenuItem
+                                   data-testid="invoice-menu-mark-paid"
                                    onClick={() => {
                                      setSelectedInvoice(invoice);
                                      setPaidDate(new Date().toISOString().split("T")[0]);

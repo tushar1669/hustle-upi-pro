@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
 import { 
@@ -15,24 +16,36 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  SkipForward
+  SkipForward,
+  Settings,
+  User,
+  FileText,
+  Eye
 } from 'lucide-react';
 
 // Import QA system components
 import { qaTestRunner } from '@/qa/testRunner';
-import { FEATURE_TESTS, type FeatureTestResult, type FeatureTestSummary } from '@/qa/featureTests';
+import { EXPANDED_FEATURE_TESTS, expandedFeatureTestRunner, type FeatureTestResult, type FeatureTestSummary } from '@/qa/expandedFeatureTests';
 import { seedDemoData, type SeedSummary } from '@/qa/demoSeed';
 import { resetDemo, type ResetSummary } from '@/qa/resetDemo';
 
 // Import Supabase for demo data counts
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function QA() {
+  const { session } = useAuth();
+  
   // Feature Tests State
   const [isRunningFeatureTests, setIsRunningFeatureTests] = useState(false);
   const [featureTestResults, setFeatureTestResults] = useState<FeatureTestResult[]>([]);
   const [featureTestSummary, setFeatureTestSummary] = useState<FeatureTestSummary | null>(null);
   const [runningTestId, setRunningTestId] = useState<string | null>(null);
+  
+  // Test Config State
+  const [isReadOnlyMode, setIsReadOnlyMode] = useState(false);
+  const [showManualChecks, setShowManualChecks] = useState(false);
+  const [manualChecklist, setManualChecklist] = useState<string>('');
   
   // Demo Data Management State
   const [isPopulating, setIsPopulating] = useState(false);
@@ -51,7 +64,8 @@ export default function QA() {
 
   useEffect(() => {
     // Load feature test results if available
-    const savedFeatureResults = qaTestRunner.getFeatureTestResults();
+    const lastResults = expandedFeatureTestRunner.getLastResults();
+    const savedFeatureResults = lastResults?.results || [];
     setFeatureTestResults(savedFeatureResults);
     
     // Load demo data counts
@@ -62,7 +76,28 @@ export default function QA() {
     const lastReset = localStorage.getItem('qa:lastResetTime');
     if (lastPopulate) setLastPopulateTime(lastPopulate);
     if (lastReset) setLastResetTime(lastReset);
-  }, []);
+    
+    // Auto-set read-only mode if demo mode is enabled
+    const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+    if (isDemoMode || !session) {
+      setIsReadOnlyMode(true);
+    }
+    
+    // Load manual checklist
+    loadManualChecklist();
+  }, [session]);
+  
+  const loadManualChecklist = async () => {
+    try {
+      const response = await fetch('/qa/mini-checklists.md');
+      if (response.ok) {
+        const content = await response.text();
+        setManualChecklist(content);
+      }
+    } catch (error) {
+      console.warn('Failed to load manual checklist:', error);
+    }
+  };
 
   const loadDemoDataCounts = async () => {
     try {
@@ -152,9 +187,12 @@ export default function QA() {
     setIsRunningFeatureTests(true);
     
     try {
-      const featureSummary = await qaTestRunner.runAllFeatureTests();
+      const featureSummary = await expandedFeatureTestRunner.runAllTests();
       setFeatureTestResults(featureSummary.results);
       setFeatureTestSummary(featureSummary);
+      
+      // Write results to files
+      await writeTestResults(featureSummary);
       
       toast({
         title: 'Feature Tests Completed',
@@ -171,12 +209,75 @@ export default function QA() {
       setIsRunningFeatureTests(false);
     }
   };
+  
+  const writeTestResults = async (summary: FeatureTestSummary) => {
+    try {
+      // Write results.json
+      const resultsData = summary.results.map(result => ({
+        id: result.id,
+        name: result.name,
+        status: result.status,
+        durationMs: result.duration,
+        notes: result.notes,
+        startedAt: new Date(Date.now() - result.duration).toISOString(),
+        finishedAt: new Date().toISOString()
+      }));
+      
+      // Write markdown report
+      const reportContent = generateMarkdownReport(summary, resultsData);
+      
+      // Store in localStorage for export
+      localStorage.setItem('qa:lastResults', JSON.stringify(resultsData));
+      localStorage.setItem('qa:lastReport', reportContent);
+      
+    } catch (error) {
+      console.warn('Failed to write test results:', error);
+    }
+  };
+  
+  const generateMarkdownReport = (summary: FeatureTestSummary, resultsData: any[]) => {
+    const timestamp = new Date().toLocaleString();
+    const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+    
+    let report = `# HustleHub QA Test Run Report\n\n`;
+    report += `**Generated:** ${timestamp}\n`;
+    report += `**Demo Mode:** ${isDemoMode ? 'Enabled' : 'Disabled'}\n`;
+    report += `**Session:** ${session ? 'Authenticated' : 'Anonymous'}\n\n`;
+    
+    // Summary table
+    report += `## Summary\n\n`;
+    report += `| Metric | Value |\n`;
+    report += `|--------|-------|\n`;
+    report += `| Total Tests | ${summary.total} |\n`;
+    report += `| Passed | ${summary.passed} |\n`;
+    report += `| Failed | ${summary.failed} |\n`;
+    report += `| Skipped | ${summary.skipped} |\n`;
+    report += `| Success Rate | ${Math.round((summary.passed / summary.total) * 100)}% |\n\n`;
+    
+    // Per-test details
+    report += `## Test Results\n\n`;
+    resultsData.forEach(result => {
+      const status = result.status === 'passed' ? '✅' : result.status === 'failed' ? '❌' : '⏭️';
+      report += `### ${status} ${result.name}\n`;
+      report += `- **Status:** ${result.status}\n`;
+      report += `- **Duration:** ${result.durationMs}ms\n`;
+      report += `- **Notes:** ${result.notes || 'None'}\n\n`;
+    });
+    
+    // Manual checks appendix
+    if (manualChecklist) {
+      report += `---\n\n`;
+      report += manualChecklist;
+    }
+    
+    return report;
+  };
 
   const handleRunSingleFeatureTest = async (testId: string) => {
     setRunningTestId(testId);
     
     try {
-      const result = await qaTestRunner.runSingleFeatureTest(testId);
+      const result = await expandedFeatureTestRunner.runSingleTest(testId);
       setFeatureTestResults(prev => prev.map(r => r.id === testId ? result : r));
       
       toast({
@@ -196,44 +297,39 @@ export default function QA() {
   };
 
   const handleExportReport = () => {
-    // Check if we have valid feature test results
-    if (!featureTestSummary || !featureTestSummary.results) {
+    const resultsData = localStorage.getItem('qa:lastResults');
+    const reportContent = localStorage.getItem('qa:lastReport');
+    
+    if (!resultsData || !reportContent) {
       toast({
         title: 'Export Warning',
-        description: 'No valid feature test results found. Run feature tests first.',
+        description: 'No test results found. Run feature tests first.',
         variant: 'destructive'
       });
       return;
     }
 
-    const exportData = {
-      executedAt: new Date().toISOString(),
-      featureTests: featureTestSummary,
-      demoCounts: demoDataCounts,
-      summary: {
-        featureTestsPassed: featureTestResults.filter(r => r.status === 'passed').length,
-        featureTestsFailed: featureTestResults.filter(r => r.status === 'failed').length,
-        featureTestsSkipped: featureTestResults.filter(r => r.status === 'skipped').length,
-        featureTestsTotal: featureTestResults.length
-      },
-      environment: {
-        userAgent: navigator.userAgent,
-        url: window.location.href,
-        timestamp: new Date().toISOString()
-      }
-    };
-
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `hustlehub-qa-report-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    // Export JSON results
+    const jsonBlob = new Blob([resultsData], { type: 'application/json' });
+    const jsonUrl = URL.createObjectURL(jsonBlob);
+    const jsonLink = document.createElement('a');
+    jsonLink.href = jsonUrl;
+    jsonLink.download = `qa-results-${new Date().toISOString().split('T')[0]}.json`;
+    jsonLink.click();
+    URL.revokeObjectURL(jsonUrl);
+    
+    // Export markdown report
+    const mdBlob = new Blob([reportContent], { type: 'text/markdown' });
+    const mdUrl = URL.createObjectURL(mdBlob);
+    const mdLink = document.createElement('a');
+    mdLink.href = mdUrl;
+    mdLink.download = `qa-report-${new Date().toISOString().split('T')[0]}.md`;
+    mdLink.click();
+    URL.revokeObjectURL(mdUrl);
     
     toast({
-      title: 'QA Report Exported',
-      description: 'Complete system test report downloaded successfully'
+      title: 'Reports Exported',
+      description: 'Both JSON results and Markdown report downloaded'
     });
   };
 
@@ -269,6 +365,8 @@ export default function QA() {
     return featureTestResults.find(r => r.id === testId);
   };
 
+  const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -276,10 +374,39 @@ export default function QA() {
           <h1 className="text-3xl font-bold text-foreground">QA Hub v2</h1>
           <p className="text-muted-foreground">Streamlined testing with one-click feature tests</p>
         </div>
-        <Button onClick={handleExportReport} className="flex items-center gap-2">
-          <Download className="w-4 h-4" />
-          Export Report
-        </Button>
+        <div className="flex items-center gap-4">
+          {/* Test Config Panel */}
+          <Card className="p-4">
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <Settings className="w-4 h-4" />
+                <span>Demo Mode:</span>
+                <Badge variant={isDemoMode ? 'destructive' : 'default'}>
+                  {isDemoMode ? 'ON' : 'OFF'}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4" />
+                <span>Session:</span>
+                <Badge variant={session ? 'default' : 'secondary'}>
+                  {session ? 'Auth' : 'Anon'}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                <span>Read-only:</span>
+                <Switch 
+                  checked={isReadOnlyMode} 
+                  onCheckedChange={setIsReadOnlyMode}
+                  disabled={isDemoMode || !session}
+                />
+              </div>
+            </div>
+          </Card>
+          <Button onClick={handleExportReport} className="flex items-center gap-2">
+            <Download className="w-4 h-4" />
+            Export Report
+          </Button>
+        </div>
       </div>
 
       {/* Header Actions - Single Row */}
@@ -358,75 +485,110 @@ export default function QA() {
         </CardContent>
       </Card>
 
-      {/* Feature Tests Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TestTube className="w-5 h-5" />
-            Feature Tests
-            {featureTestSummary && (
-              <Badge variant="outline">
-                {featureTestSummary.passed}/{featureTestSummary.total} passed
-              </Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table data-testid="qa-feature-tests-table">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Test</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Duration</TableHead>
-                <TableHead>Notes</TableHead>
-                <TableHead>Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {FEATURE_TESTS.map((test) => {
-                const result = getTestResult(test.id);
-                const isRunning = runningTestId === test.id;
-                
-                return (
-                  <TableRow key={test.id}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{test.name}</div>
-                        <div className="text-sm text-muted-foreground">{test.description}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {getStatusIcon(result?.status || 'not-run')}
-                        {getStatusBadge(result?.status || 'not-run')}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {result?.duration ? `${result.duration}ms` : '-'}
-                    </TableCell>
-                    <TableCell className="max-w-md truncate">
-                      {result?.notes || '-'}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleRunSingleFeatureTest(test.id)}
-                        disabled={isRunning || isRunningFeatureTests}
-                        data-testid={`qa-run-test-${test.id}`}
-                        className="flex items-center gap-1"
-                      >
-                        <Play className="w-3 h-3" />
-                        {isRunning ? 'Running' : 'Run'}
-                      </Button>
-                    </TableCell>
+      {/* Main Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          {/* Feature Tests Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <TestTube className="w-5 h-5" />
+                  Feature Tests ({EXPANDED_FEATURE_TESTS.length} total)
+                  {featureTestSummary && (
+                    <Badge variant="outline">
+                      {featureTestSummary.passed}/{featureTestSummary.total} passed
+                    </Badge>
+                  )}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowManualChecks(!showManualChecks)}
+                  className="flex items-center gap-2"
+                >
+                  <Eye className="w-4 h-4" />
+                  Manual Checks
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table data-testid="qa-feature-tests-table">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Test</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Duration</TableHead>
+                    <TableHead>Notes</TableHead>
+                    <TableHead>Action</TableHead>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {EXPANDED_FEATURE_TESTS.map((test) => {
+                    const result = getTestResult(test.id);
+                    const isRunning = runningTestId === test.id;
+                    
+                    return (
+                      <TableRow key={test.id}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{test.name}</div>
+                            <div className="text-sm text-muted-foreground">{test.description}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {getStatusIcon(result?.status || 'not-run')}
+                            {getStatusBadge(result?.status || 'not-run')}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {result?.duration ? `${result.duration}ms` : '-'}
+                        </TableCell>
+                        <TableCell className="max-w-md truncate">
+                          {result?.notes || '-'}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRunSingleFeatureTest(test.id)}
+                            disabled={isRunning || isRunningFeatureTests}
+                            data-testid={`qa-run-test-${test.id}`}
+                            className="flex items-center gap-1"
+                          >
+                            <Play className="w-3 h-3" />
+                            {isRunning ? 'Running' : 'Run'}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+        
+        {/* Manual Checks Panel */}
+        <div className="space-y-6">
+          {showManualChecks && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Manual Checks
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="prose prose-sm max-w-none">
+                  <pre className="whitespace-pre-wrap text-sm">{manualChecklist || 'Loading checklist...'}</pre>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

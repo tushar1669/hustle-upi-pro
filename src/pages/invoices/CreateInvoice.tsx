@@ -457,6 +457,7 @@ export default function CreateInvoice() {
             onClick={saveDraft}
             disabled={isDemoMode || !session}
             title={isDemoMode ? "Demo mode: saving is disabled" : !session ? "Sign in to save invoices" : ""}
+            data-testid="btn-save-draft"
           >
             <FileText className="h-4 w-4 mr-2" />
             Save Draft
@@ -466,6 +467,7 @@ export default function CreateInvoice() {
             variant="gradient"
             disabled={isDemoMode || !session}
             title={isDemoMode ? "Demo mode: saving is disabled" : !session ? "Sign in to send invoices" : ""}
+            data-testid="btn-save-send"
           >
             <Send className="h-4 w-4 mr-2" />
             Save & Send
@@ -477,7 +479,7 @@ export default function CreateInvoice() {
         {/* Left Column - Form */}
         <div className="space-y-6">
           {/* Client & Project Selection */}
-          <Card>
+          <Card data-testid="invoice-form">
             <CardHeader>
               <CardTitle>Client & Project</CardTitle>
             </CardHeader>
@@ -622,7 +624,7 @@ export default function CreateInvoice() {
 
         {/* Right Column - Preview */}
         <div className="space-y-6">
-          <Card>
+          <Card data-testid="invoice-preview-card">
             <CardHeader>
               <CardTitle>Invoice Preview</CardTitle>
             </CardHeader>
