@@ -340,6 +340,7 @@ export default function Settings() {
               variant="gradient"
               disabled={updateSettings.isPending}
               className="min-w-[120px]"
+              data-testid="btn-save-settings"
             >
               {updateSettings.isPending ? "Saving..." : "Save Settings"}
             </Button>

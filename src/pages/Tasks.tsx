@@ -140,7 +140,7 @@ function TaskEditModal({
           <div>
             <Label htmlFor="t-project">Project</Label>
             <Select value={projectId} onValueChange={setProjectId}>
-              <SelectTrigger>
+              <SelectTrigger data-testid="task-project-select">
                 <SelectValue placeholder="Select project (optional)" />
               </SelectTrigger>
               <SelectContent>

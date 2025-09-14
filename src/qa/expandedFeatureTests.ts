@@ -2,6 +2,7 @@
 // Demo-aware testing with comprehensive coverage
 
 import { TestResult } from './testUtils';
+import { qaFixtures } from './fixtures';
 import { 
   gotoAndWait, 
   waitForId, 
@@ -92,6 +93,9 @@ export const EXPANDED_FEATURE_TESTS = [
         const startTime = Date.now();
         const { isDemoMode, hasSession } = getDemoAndSessionState();
         
+        // Ensure fixtures exist first
+        await qaFixtures.ensureClient();
+        
         const success = await gotoAndWait('/clients', 'btn-add-client');
         if (!success) {
           return { 
@@ -157,6 +161,9 @@ export const EXPANDED_FEATURE_TESTS = [
       return runWithQaReturn(async () => {
         const startTime = Date.now();
         
+        // Ensure fixtures exist first
+        await qaFixtures.ensureProject();
+        
         const success = await gotoAndWait('/projects', 'project-card');
         if (!success) {
           return { 
@@ -208,6 +215,9 @@ export const EXPANDED_FEATURE_TESTS = [
     run: async (): Promise<FeatureTestResult> => {
       return runWithQaReturn(async () => {
         const startTime = Date.now();
+        
+        // Ensure fixtures exist first
+        await qaFixtures.ensureTask();
         
         const success = await gotoAndWait('/tasks', 'task-card');
         if (!success) {
@@ -374,6 +384,9 @@ export const EXPANDED_FEATURE_TESTS = [
         const startTime = Date.now();
         const { isDemoMode, hasSession } = getDemoAndSessionState();
         
+        // Ensure fixtures exist first
+        await qaFixtures.ensureInvoice();
+        
         const success = await gotoAndWait('/invoices', 'invoice-menu-trigger');
         if (!success) {
           return { 
@@ -431,6 +444,9 @@ export const EXPANDED_FEATURE_TESTS = [
       return runWithQaReturn(async () => {
         const startTime = Date.now();
         
+        // Ensure fixtures exist first
+        await qaFixtures.ensureFollowup();
+        
         const success = await gotoAndWait('/follow-ups', 'reminder-row');
         if (!success) {
           return { 
@@ -478,6 +494,9 @@ export const EXPANDED_FEATURE_TESTS = [
     run: async (): Promise<FeatureTestResult> => {
       return runWithQaReturn(async () => {
         const startTime = Date.now();
+        
+        // Ensure fixtures exist first
+        await qaFixtures.ensureFollowup();
         
         const success = await gotoAndWait('/follow-ups', 'reminder-row');
         if (!success) {
@@ -536,6 +555,9 @@ export const EXPANDED_FEATURE_TESTS = [
       return runWithQaReturn(async () => {
         const startTime = Date.now();
         const { isDemoMode, hasSession } = getDemoAndSessionState();
+        
+        // Ensure fixtures exist first
+        await qaFixtures.ensureSavingsGoalWithEntries();
         
         const success = await gotoAndWait('/savings', 'goal-card');
         if (!success) {

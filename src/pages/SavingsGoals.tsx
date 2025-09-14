@@ -200,7 +200,7 @@ export default function SavingsGoals() {
             const progress = getProgress(actualSaved, goal.target_amount);
             
             return (
-              <Card key={goal.id}>
+              <Card key={goal.id} data-testid="goal-card">
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
@@ -217,6 +217,7 @@ export default function SavingsGoals() {
                         size="sm"
                         onClick={() => setEntriesFor({ id: goal.id, title: goal.title })}
                         title="View entries"
+                        data-testid="btn-view-entries"
                       >
                         <ClipboardList className="h-4 w-4" />
                       </Button>
@@ -225,6 +226,7 @@ export default function SavingsGoals() {
                         size="sm"
                         onClick={() => handleAddEntry(goal)}
                         title="Add Entry"
+                        data-testid="btn-add-entry"
                       >
                         <PlusCircle className="h-4 w-4" />
                       </Button>

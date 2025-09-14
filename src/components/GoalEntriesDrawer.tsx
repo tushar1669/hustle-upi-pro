@@ -61,7 +61,7 @@ export default function GoalEntriesDrawer({ isOpen, onClose, goalId, goalTitle }
   return (
     <>
       <Drawer open={isOpen} onOpenChange={onClose}>
-        <DrawerContent className="max-h-[80vh]">
+        <DrawerContent className="max-h-[80vh]" data-testid="entries-drawer">
           <DrawerHeader className="flex flex-row items-center justify-between">
             <DrawerTitle className="flex items-center gap-2">
               <ClipboardList className="h-5 w-5" />
@@ -101,8 +101,8 @@ export default function GoalEntriesDrawer({ isOpen, onClose, goalId, goalTitle }
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedEntries.map((entry: SavingsEntry) => (
-                      <TableRow key={entry.id}>
+                     {sortedEntries.map((entry: SavingsEntry) => (
+                       <TableRow key={entry.id} data-testid="entry-item">
                         <TableCell className="font-medium">
                           ₹{entry.amount.toLocaleString()}
                         </TableCell>

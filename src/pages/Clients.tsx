@@ -188,6 +188,7 @@ export default function Clients() {
                 <Label htmlFor="name">Name *</Label>
                 <Input
                   id="name"
+                  data-testid="client-form-name"
                   value={formData.name}
                   onChange={(e) => handleInputChange('name', e.target.value)}
                   required
@@ -212,6 +213,7 @@ export default function Clients() {
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
+                  data-testid="client-form-email"
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}

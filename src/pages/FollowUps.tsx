@@ -775,7 +775,7 @@ export default function FollowUps() {
                 const canSelect = reminder.status === 'pending';
 
                 return (
-                  <TableRow key={reminder.id} className={isSelected ? "bg-muted/50" : ""}>
+                  <TableRow key={reminder.id} className={isSelected ? "bg-muted/50" : ""} data-testid="reminder-row">
                     <TableCell className="w-12">
                       {canSelect && (
                         <Checkbox
@@ -821,27 +821,27 @@ export default function FollowUps() {
                          {reminder.status === 'pending' && (
                            <>
                              {reminder.channel === 'whatsapp' ? (
-                               <Button 
-                                 size="sm" 
-                                 onClick={() => handleSendNow(reminder)}
-                                 data-testid="btn-open-reminder-preview"
-                                 disabled={!client.whatsapp}
-                               >
-                                 <MessageSquare className="h-4 w-4 mr-1" />
-                                 WhatsApp
-                               </Button>
+                                <Button 
+                                  size="sm" 
+                                  onClick={() => handleSendNow(reminder)}
+                                  data-testid="btn-send-whatsapp"
+                                  disabled={!client.whatsapp}
+                                >
+                                  <MessageSquare className="h-4 w-4 mr-1" />
+                                  WhatsApp
+                                </Button>
                               ) : (
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <Button 
-                                      size="sm" 
-                                      onClick={() => handleSendNow(reminder)}
-                                      data-testid="btn-open-reminder-preview"
-                                      disabled={!client.email}
-                                    >
-                                      <Mail className="h-4 w-4 mr-1" />
-                                      Email
-                                    </Button>
+                                     <Button 
+                                       size="sm" 
+                                       onClick={() => handleSendNow(reminder)}
+                                       data-testid="btn-send-email"
+                                       disabled={!client.email}
+                                     >
+                                       <Mail className="h-4 w-4 mr-1" />
+                                       Email
+                                     </Button>
                                   </TooltipTrigger>
                                   {!client.email && (
                                     <TooltipContent>
@@ -861,12 +861,12 @@ export default function FollowUps() {
                                 })}
                               >
                                 <PopoverTrigger asChild>
-                                  <Button size="sm" variant="outline">
+                                  <Button size="sm" variant="outline" data-testid="btn-quick-reschedule">
                                     <CalendarDays className="h-4 w-4 mr-1" />
                                     Reschedule
                                   </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-64" align="end">
+                                <PopoverContent className="w-64" align="end" data-testid="reschedule-options">
                                   <div className="space-y-3">
                                     <h4 className="font-medium">Quick Reschedule</h4>
                                     <div className="grid grid-cols-1 gap-2">
@@ -881,6 +881,7 @@ export default function FollowUps() {
                                         size="sm" 
                                         variant="outline" 
                                         onClick={() => handleQuickReschedule(reminder, 3)}
+                                        data-testid="btn-reschedule-3d"
                                       >
                                         +3 days
                                       </Button>
