@@ -1,50 +1,59 @@
-# HustleHub — Mini QA Checklists
+# HustleHub — Mini QA Checklists (2–4 min each)
 
-> Fast 2–4 min runs per PR. Keep demo gating in mind: when VITE_DEMO_MODE=true, writes should be blocked with friendly toasts.
+> Preflight (always):
+> - Note Demo mode in header: ON blocks writes with friendly toasts; OFF allows writes
+> - You should see "Demo: ON/OFF, Session: Auth/Anon" in /qa
+> - If lists are empty, press **Populate Demo Data** (this seeds only QA-prefixed items)
 
-## 1) feat: Entries manager for Savings Goals (view & delete)
-- [ ] Create a goal; add 2 entries
-- [ ] Open Entries drawer → newest-first list
-- [ ] Delete one entry → list + progress update
-- [ ] Delete last entry → empty state appears
+## 1) Clients — CRUD & Validation
+- [ ] Click "Add Client" → modal opens (fields have labels + inline errors)
+- [ ] Enter bad email → "Enter a valid email" appears; **Save disabled**
+- [ ] Enter valid name/email → in Live: saves and appears in list; in Demo/Anon: gating toast appears
+**Pass if:** modal loads, validation fires, correct gating in Demo/Anon.
 
-## 2) fix: Allow changing Project when editing a Task
-- [ ] Create projects A and B; create task under A
-- [ ] Edit task → change project to B → Save
-- [ ] Verify list + "Filter by B" shows task
+## 2) Tasks — Edit Project Assignment
+- [ ] Open any task → "Edit"
+- [ ] Change Project via dropdown (No Project = "none" sentinel, not blank)
+- [ ] Click Save
+**Pass if:** modal shows project select and Save; change applies in Live; toast gates in Demo/Anon.
 
-## 3) demo-mode gating
-- [ ] Set VITE_DEMO_MODE=true → rebuild preview
-- [ ] Save Draft invoice → "Demo mode: saving is disabled"
-- [ ] Mark as Paid → "Demo mode: updates are disabled"
-- [ ] Flip to false + sign in → actions succeed
+## 3) Invoices — Create & Tabs
+- [ ] /invoices/new loads with invoice number for current year (…0001/…0002)
+- [ ] "Save Draft" shows Demo gating in Demo/Anon; saves in Live
+- [ ] /invoices → tabs "All/Draft/Sent/Overdue/Paid" filter correctly
+**Pass if:** page loads, gating/saves correct, tabs filter list.
 
-## 4) Polish pack (Follow-ups + Projects + Tasks UX)
-- [ ] Follow-ups: client w/o email → Email disabled + tooltip
-- [ ] Loading skeletons for Follow-ups & Projects
-- [ ] Forced error shows friendly card with Refresh
-- [ ] Tasks add/edit: Save shows spinner; due date ≥ today
+## 4) Invoices — Mark Paid & Undo
+- [ ] Row menu shows **Mark as Paid** when status ≠ paid; opens modal
+- [ ] Set date → confirm → status = paid, `paid_at` set (Live); Demo/Anon shows gating toast
+- [ ] Undo Paid resets to draft, clears `paid_at` (Live)
+**Pass if:** menu item visible when expected; `paid_at` used consistently.
 
-## 5) B pack (Should-have)
-- [ ] Follow-ups quick reschedule: +3 days → toast + list update
-- [ ] Clients validation: bad email/phone/UPI → inline errors; Save disabled until fixed
-- [ ] Invoices: Mark as sent + Undo sent; "Copy details" works; "Share" works/fallback copies
+## 5) Follow-ups — Quick Reschedule & Channels
+- [ ] Open Follow-ups → pick a reminder → "Quick Reschedule" → **+3 days**
+- [ ] Email button disabled if client lacks email; WhatsApp available
+**Pass if:** reschedule toasts, list updates; email disabled state correct.
 
-## 6) C pack (Hardening)
-- [ ] RLS: impersonate current user → data visible; different UUID → empty; no session → empty
-- [ ] Invoices: Mark Paid sets `paid_at`; Undo Paid clears it; "overdue" only when non-paid and due in past
-- [ ] FK friendly errors for Projects and Clients deletions
+## 6) Savings — Entries Drawer
+- [ ] Open a goal → "View Entries" → newest-first list
+- [ ] Add entry (Live) / toast (Demo/Anon)
+- [ ] Delete last entry → empty state shows
+**Pass if:** drawer works; add/delete path correct for mode.
 
-## 7) Stabilize core flows
-- [ ] Create invoices → numbers increment per year (`…0001`, `…0002`)
-- [ ] No collisions/crashes on rapid saves
-- [ ] InvoicesList loads; Follow-ups reads `paid_at` only
+## 7) Settings — Required Fields
+- [ ] Confirm fields exist: UPI VPA, Display Name, Invoice Prefix, Company Name, Default GST%
+- [ ] Save (Live) / toast (Demo/Anon)
+**Pass if:** 5 fields visible; Save behaves per mode.
 
-## 8) Go-Live pass (final sweep)
-- [ ] Draft → Sent → Undo → Paid → Undo Paid (caches invalidate)
-- [ ] Demo mode on/off verified
-- [ ] Error toasts show Supabase messages
+## 8) Hardening — RLS & Errors
+- [ ] Try deleting a Project with tasks → friendly FK message
+- [ ] (Optional SQL) Impersonate another UUID → lists empty
+**Pass if:** FK messages are human; RLS yields empty for other UUID/no session.
 
-Notes:
-- To impersonate a user in SQL: 
-  select set_config('request.jwt.claims', json_build_object('role','authenticated','sub','<USER_UUID>')::text, true);
+## 9) Navigation — Active States
+- [ ] Visit `/`, `/invoices`, `/settings`
+**Pass if:** active nav state highlights for each.
+
+## 10) Export QA Report
+- [ ] /qa → Run Feature Tests → Export Report
+**Pass if:** downloads **qa-results-YYYY-MM-DD.json** + **qa-report-YYYY-MM-DD.md**
