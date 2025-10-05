@@ -298,10 +298,10 @@ export default function InvoicePreviewModal({ isOpen, onClose, invoice }: Invoic
           </div>
 
           {/* Payment Details */}
-          {invoice.status === 'paid' && invoice.paid_date && (
+          {invoice.status === 'paid' && invoice.paid_at && (
             <div className="border-t pt-4">
               <div className="text-sm text-muted-foreground">
-                <div><span className="font-medium">Paid on:</span> {new Date(invoice.paid_date).toLocaleDateString()}</div>
+                <div><span className="font-medium">Paid on:</span> {new Date(invoice.paid_at).toLocaleDateString()}</div>
                 {invoice.utr_reference && (
                   <div><span className="font-medium">UTR Reference:</span> {invoice.utr_reference}</div>
                 )}

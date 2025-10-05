@@ -306,9 +306,9 @@ export const QA_TESTS: QATest[] = [
         const metrics = await collections.v_dashboard_metrics();
         const paidInvoices = await supabase
           .from('invoices')
-          .select('total_amount, paid_date')
+          .select('total_amount, paid_at')
           .eq('status', 'paid')
-          .gte('paid_date', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
+          .gte('paid_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
 
         const thisMonthPaid = paidInvoices.data?.reduce((sum, inv) => sum + inv.total_amount, 0) || 0;
         const metricsMatch = Math.abs(metrics.this_month_paid - thisMonthPaid) < 0.01;

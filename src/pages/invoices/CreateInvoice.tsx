@@ -18,12 +18,10 @@ import {
   clients_all, 
   projects_all, 
   invoices_all,
-  create_invoice, 
-  create_item, 
   create_message_log,
-  create_reminder,
-  update_invoice
+  create_reminder
 } from "@/data/collections";
+import { rpcCreateInvoiceWithItems } from "@/lib/invoiceRpc";
 import { useToast } from "@/hooks/use-toast";
 import { useCelebrationContext } from "@/components/CelebrationProvider";
 import AddClientModal from "@/components/AddClientModal";
@@ -198,50 +196,25 @@ export default function CreateInvoice() {
     }
     
     try {
-      // Collision-safe invoice creation with retry logic
-      let invoice;
-      let attempts = 0;
-      const maxAttempts = 10;
-      
-      while (attempts < maxAttempts) {
-        try {
-          const invoiceData = {
-            invoice_number: invoiceNumber,
-            client_id: clientId,
-            project_id: projectId || null,
-            issue_date: new Date().toISOString(),
-            due_date: new Date(dueDate).toISOString(),
-            subtotal,
-            gst_amount: gstAmount,
-            total_amount: totalAmount,
-            status: "draft" as const
-          };
-
-          invoice = await create_invoice(invoiceData);
-          break; // Success, exit retry loop
-        } catch (error: any) {
-          if (error?.code === '23505' && error?.message?.includes('invoice_number')) {
-            // Unique violation on invoice number, retry with incremented number
-            attempts++;
-            if (attempts >= maxAttempts) {
-              throw new Error("Unable to generate unique invoice number after multiple attempts");
-            }
-            continue;
-          }
-          throw error; // Re-throw other errors
-        }
-      }
-      
-      // Create line items
-      for (const item of lineItems) {
-        await create_item({
-          invoice_id: invoice.id,
-          title: item.title,
-          qty: item.qty,
-          rate: item.rate,
-          amount: item.amount
-        });
-      }
+      // Use server-side RPC for collision-safe invoice creation
+      const invoice = await rpcCreateInvoiceWithItems({
+        owner_id: session.user.id,
+        invoice_prefix: settings!.invoice_prefix,
+        client_id: clientId,
+        project_id: projectId || null,
+        issue_date: new Date().toISOString().slice(0, 10),
+        due_date: new Date(dueDate).toISOString().slice(0, 10),
+        subtotal,
+        gst_amount: gstAmount,
+        total_amount: totalAmount,
+        status: "draft",
+        items: lineItems.map(li => ({ 
+          title: li.title, 
+          qty: li.qty, 
+          rate: li.rate, 
+          amount: li.amount 
+        }))
+      });
 
       await create_message_log({
         related_type: "invoice",
@@ -303,50 +276,25 @@ export default function CreateInvoice() {
     }
     
     try {
-      // Collision-safe invoice creation with retry logic
-      let invoice;
-      let attempts = 0;
-      const maxAttempts = 10;
-      
-      while (attempts < maxAttempts) {
-        try {
-          const invoiceData = {
-            invoice_number: invoiceNumber,
-            client_id: clientId,
-            project_id: projectId || null,
-            issue_date: new Date().toISOString(),
-            due_date: new Date(dueDate).toISOString(),
-            subtotal,
-            gst_amount: gstAmount,
-            total_amount: totalAmount,
-            status: "sent" as const
-          };
-
-          invoice = await create_invoice(invoiceData);
-          break; // Success, exit retry loop
-        } catch (error: any) {
-          if (error?.code === '23505' && error?.message?.includes('invoice_number')) {
-            // Unique violation on invoice number, retry with incremented number
-            attempts++;
-            if (attempts >= maxAttempts) {
-              throw new Error("Unable to generate unique invoice number after multiple attempts");
-            }
-            continue;
-          }
-          throw error; // Re-throw other errors
-        }
-      }
-      
-      // Create line items
-      for (const item of lineItems) {
-        await create_item({
-          invoice_id: invoice.id,
-          title: item.title,
-          qty: item.qty,
-          rate: item.rate,
-          amount: item.amount
-        });
-      }
+      // Use server-side RPC for collision-safe invoice creation
+      const invoice = await rpcCreateInvoiceWithItems({
+        owner_id: session.user.id,
+        invoice_prefix: settings!.invoice_prefix,
+        client_id: clientId,
+        project_id: projectId || null,
+        issue_date: new Date().toISOString().slice(0, 10),
+        due_date: new Date(dueDate).toISOString().slice(0, 10),
+        subtotal,
+        gst_amount: gstAmount,
+        total_amount: totalAmount,
+        status: "sent",
+        items: lineItems.map(li => ({ 
+          title: li.title, 
+          qty: li.qty, 
+          rate: li.rate, 
+          amount: li.amount 
+        }))
+      });
 
       // Create reminders from issue date
       const issueDate = new Date();

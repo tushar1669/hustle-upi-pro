@@ -11,7 +11,7 @@ export interface InvoiceData {
   gst_amount: number;
   total_amount: number;
   status: string;
-  paid_date?: string;
+  paid_at?: string;
   utr_reference?: string;
 }
 
@@ -146,12 +146,12 @@ export const generateInvoicePDF = async (
           </div>
         </div>
 
-        ${invoice.status === 'paid' && invoice.paid_date ? `
+        ${invoice.status === 'paid' && invoice.paid_at ? `
           <!-- Payment Info -->
           <div style="border: 1px solid #16a34a; background-color: #f0fdf4; padding: 20px; margin-bottom: 30px; border-radius: 4px;">
             <div style="color: #16a34a; font-weight: bold; font-size: 16px; margin-bottom: 10px;">✅ Payment Received</div>
             <div style="font-size: 14px; color: #15803d;">
-              <div><strong>Paid on:</strong> ${new Date(invoice.paid_date).toLocaleDateString()}</div>
+              <div><strong>Paid on:</strong> ${new Date(invoice.paid_at).toLocaleDateString()}</div>
               ${invoice.utr_reference ? `<div><strong>UTR Reference:</strong> ${invoice.utr_reference}</div>` : ''}
             </div>
           </div>

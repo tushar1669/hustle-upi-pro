@@ -336,7 +336,7 @@ class SmokeTestRunner {
         .from('invoices')
         .update({
           status: 'paid',
-          paid_date: new Date().toISOString().split('T')[0],
+          paid_at: new Date().toISOString(),
           utr_reference: `QA-UTR-${timestamp}`
         })
         .eq('id', tempInvoice.id);

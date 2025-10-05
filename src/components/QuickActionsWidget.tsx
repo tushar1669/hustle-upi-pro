@@ -66,10 +66,10 @@ export default function QuickActionsWidget() {
   const recentInvoices = invoices.slice(0, 5).reverse();
 
   const recentPayments = invoices
-    .filter((i: any) => i.status === "paid" && i.paid_date)
+    .filter((i: any) => i.status === "paid" && i.paid_at)
     .sort(
       (a: any, b: any) =>
-        new Date(b.paid_date).getTime() - new Date(a.paid_date).getTime()
+        new Date(b.paid_at).getTime() - new Date(a.paid_at).getTime()
     )
     .slice(0, 5);
 

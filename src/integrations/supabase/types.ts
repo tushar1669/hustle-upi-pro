@@ -83,6 +83,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_invoice_items_invoice"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "invoice_items_invoice_id_fkey"
             columns: ["invoice_id"]
             isOneToOne: false
@@ -102,7 +109,6 @@ export type Database = {
           issue_date: string | null
           owner_id: string
           paid_at: string | null
-          paid_date: string | null
           pdf_url: string | null
           project_id: string | null
           share_url: string | null
@@ -122,7 +128,6 @@ export type Database = {
           issue_date?: string | null
           owner_id?: string
           paid_at?: string | null
-          paid_date?: string | null
           pdf_url?: string | null
           project_id?: string | null
           share_url?: string | null
@@ -142,7 +147,6 @@ export type Database = {
           issue_date?: string | null
           owner_id?: string
           paid_at?: string | null
-          paid_date?: string | null
           pdf_url?: string | null
           project_id?: string | null
           share_url?: string | null
@@ -229,6 +233,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_projects_client"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "projects_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -267,6 +278,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_reminders_invoice"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "reminders_invoice_id_fkey"
             columns: ["invoice_id"]
             isOneToOne: false
@@ -301,6 +319,20 @@ export type Database = {
           owner_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_savings_entries_goal"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "savings_goals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_savings_entries_goal"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "savings_goals_v"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "savings_entries_goal_id_fkey"
             columns: ["goal_id"]
@@ -440,6 +472,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_tasks_project"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tasks_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -519,7 +558,14 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      create_invoice_with_items: {
+        Args: { p_invoice: Json; p_items: Json }
+        Returns: Json
+      }
+      next_invoice_number: {
+        Args: { p_issue_date?: string; p_owner_id: string; p_prefix: string }
+        Returns: string
+      }
     }
     Enums: {
       channel_type: "whatsapp" | "email"
