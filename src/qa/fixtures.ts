@@ -10,9 +10,11 @@ import {
   projects_all,
   tasks_all,
   invoices_all,
-  savings_goals_all
+  savings_goals_all,
+  settings_one
 } from '@/data/collections';
 import { supabase } from '@/integrations/supabase/client';
+import { rpcCreateInvoiceWithItems } from '@/lib/invoiceRpc';
 
 // QA Fixtures Helper
 // Creates minimal test data with QA: prefix to avoid conflicts and ensure cleanup
@@ -72,20 +74,32 @@ export const qaFixtures = {
     if (!qaInvoice) {
       const client = clientId ? { id: clientId } : await this.ensureClient();
       const project = projectId ? { id: projectId } : await this.ensureProject();
+      const settings = await settings_one();
       
-      const year = new Date().getFullYear();
-      const invoiceNumber = `QA${year}0001`;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No authenticated user for QA fixtures');
       
-      return await create_invoice({
+      const subtotal = 10000;
+      const gstAmount = 1800;
+      const totalAmount = subtotal + gstAmount;
+      
+      const issueDate = new Date().toISOString().split('T')[0];
+      const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      
+      return await rpcCreateInvoiceWithItems({
+        owner_id: user.id,
+        invoice_prefix: settings?.invoice_prefix || 'QA',
         client_id: client.id,
         project_id: project.id,
-        invoice_number: invoiceNumber,
+        issue_date: issueDate,
+        due_date: dueDate,
+        subtotal: subtotal,
+        gst_amount: gstAmount,
+        total_amount: totalAmount,
         status: 'sent',
-        issue_date: new Date().toISOString(),
-        due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        subtotal: 10000,
-        gst_amount: 1800,
-        total_amount: 11800
+        items: [
+          { title: 'QA Test Service', qty: 1, rate: 10000, amount: 10000 }
+        ]
       });
     }
     return qaInvoice;
