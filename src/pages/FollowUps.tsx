@@ -830,26 +830,28 @@ export default function FollowUps() {
                                   <MessageSquare className="h-4 w-4 mr-1" />
                                   WhatsApp
                                 </Button>
-                              ) : (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                     <Button 
-                                       size="sm" 
-                                       onClick={() => handleSendNow(reminder)}
-                                       data-testid="btn-send-email"
-                                       disabled={!client.email}
-                                     >
-                                       <Mail className="h-4 w-4 mr-1" />
-                                       Email
-                                     </Button>
-                                  </TooltipTrigger>
-                                  {!client.email && (
-                                    <TooltipContent>
-                                      <p>Add an email to this client to enable email reminders</p>
-                                    </TooltipContent>
-                                  )}
-                                </Tooltip>
-                              )}
+                               ) : (
+                                 <TooltipProvider>
+                                   <Tooltip>
+                                     <TooltipTrigger asChild>
+                                        <Button 
+                                          size="sm" 
+                                          onClick={() => handleSendNow(reminder)}
+                                          data-testid="btn-send-email"
+                                          disabled={!client.email}
+                                        >
+                                          <Mail className="h-4 w-4 mr-1" />
+                                          Email
+                                        </Button>
+                                     </TooltipTrigger>
+                                     {!client.email && (
+                                       <TooltipContent>
+                                         <p>Add an email to this client to enable email reminders</p>
+                                       </TooltipContent>
+                                     )}
+                                   </Tooltip>
+                                 </TooltipProvider>
+                               )}
                               <Button size="sm" variant="outline" onClick={() => handleSkip(reminder)}>
                                 Skip
                               </Button>

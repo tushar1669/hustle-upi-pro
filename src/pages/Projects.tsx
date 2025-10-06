@@ -183,7 +183,7 @@ const Projects = () => {
               </TableHeader>
               <TableBody>
                 {projects.map((project: any) => (
-                  <TableRow key={project.id}>
+                  <TableRow key={project.id} data-testid="project-card">
                     <TableCell className="font-medium">{project.name}</TableCell>
                     <TableCell>{getClientName(project.client_id)}</TableCell>
                     <TableCell>
@@ -207,6 +207,7 @@ const Projects = () => {
                           size="icon"
                           variant="ghost"
                           onClick={() => setDeleteProject(project)}
+                          data-testid="project-delete-btn"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -241,7 +242,7 @@ const Projects = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => handleDelete(deleteProject)}>
+            <AlertDialogAction onClick={() => handleDelete(deleteProject)} data-testid="confirm-delete-project">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

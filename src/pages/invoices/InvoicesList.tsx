@@ -382,7 +382,7 @@ export default function InvoicesList() {
                     const displayStatus = isOverdue ? "overdue" : invoice.status;
 
                     return (
-                      <TableRow key={invoice.id} data-testid={`invoice-row-${invoice.id}`}>
+                      <TableRow key={invoice.id} data-testid="invoice-card">
                         <TableCell className="font-medium">
                           {invoice.invoice_number}
                         </TableCell>
@@ -436,7 +436,7 @@ export default function InvoicesList() {
                               )}
 
                 {invoice.status === "paid" && (
-                  <DropdownMenuItem onClick={() => handleUndoPaid(invoice)}>
+                  <DropdownMenuItem onClick={() => handleUndoPaid(invoice)} data-testid="invoice-menu-undo-paid">
                     <Circle className="mr-2 h-4 w-4" />
                     Undo paid
                   </DropdownMenuItem>

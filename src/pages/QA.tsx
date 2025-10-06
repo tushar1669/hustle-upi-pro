@@ -26,8 +26,7 @@ import {
 // Import QA system components
 import { qaTestRunner } from '@/qa/testRunner';
 import { EXPANDED_FEATURE_TESTS, expandedFeatureTestRunner, type FeatureTestResult, type FeatureTestSummary } from '@/qa/expandedFeatureTests';
-import { seedDemoData, type SeedSummary } from '@/qa/demoSeed';
-import { resetDemo, type ResetSummary } from '@/qa/resetDemo';
+import { seedFullDemo, resetQaFixtures } from '@/qa/seed';
 
 // Import Supabase for demo data counts
 import { supabase } from '@/integrations/supabase/client';
@@ -55,10 +54,12 @@ export default function QA() {
   const [demoDataCounts, setDemoDataCounts] = useState({
     clients: 0,
     projects: 0,
+    tasks: 0,
     invoices: 0,
     items: 0,
-    tasks: 0,
     reminders: 0,
+    goals: 0,
+    entries: 0,
     logs: 0
   });
 
@@ -102,23 +103,27 @@ export default function QA() {
   const loadDemoDataCounts = async () => {
     try {
       // Count QA entities
-      const [clientsRes, projectsRes, invoicesRes, itemsRes, tasksRes, remindersRes, logsRes] = await Promise.all([
-        supabase.from('clients').select('id', { count: 'exact' }).or('name.eq.Acme Studios,name.eq.Bright Ideas,name.eq.Creative Minds,name.eq.QA Co'),
-        supabase.from('projects').select('id', { count: 'exact' }).eq('name', 'Website Revamp'),
-        supabase.from('invoices').select('id', { count: 'exact' }).or('invoice_number.like.QA-%,invoice_number.like.HH-%'),
-        supabase.from('invoice_items').select('id', { count: 'exact' }).in('title', ['UI Design Sprint', 'Brand Kit', 'Content Pack']),
-        supabase.from('tasks').select('id', { count: 'exact' }).or('title.eq.Send assets to Acme,title.eq.Bright Ideas review call,title.eq.Portfolio refresh'),
-        supabase.from('reminders').select('id', { count: 'exact' }).eq('status', 'pending'),
-        supabase.from('message_log').select('id', { count: 'exact' }).eq('related_type', 'qa').limit(10)
+      const [clientsRes, projectsRes, tasksRes, invoicesRes, itemsRes, remindersRes, goalsRes, entriesRes, logsRes] = await Promise.all([
+        supabase.from('clients').select('id', { count: 'exact' }).ilike('name', 'QA:%'),
+        supabase.from('projects').select('id', { count: 'exact' }).ilike('name', 'QA:%'),
+        supabase.from('tasks').select('id', { count: 'exact' }).ilike('title', 'QA:%'),
+        supabase.from('invoices').select('id', { count: 'exact' }).like('invoice_number', 'HH-%'),
+        supabase.from('invoice_items').select('id', { count: 'exact' }).ilike('title', 'QA:%'),
+        supabase.from('reminders').select('id', { count: 'exact' }),
+        supabase.from('savings_goals').select('id', { count: 'exact' }).ilike('title', 'QA:%'),
+        supabase.from('savings_entries').select('id', { count: 'exact' }).ilike('note', 'QA:%'),
+        supabase.from('message_log').select('id', { count: 'exact' }).ilike('template_used', '%created%')
       ]);
       
       setDemoDataCounts({
         clients: clientsRes.count || 0,
         projects: projectsRes.count || 0,
+        tasks: tasksRes.count || 0,
         invoices: invoicesRes.count || 0,
         items: itemsRes.count || 0,
-        tasks: tasksRes.count || 0,
         reminders: remindersRes.count || 0,
+        goals: goalsRes.count || 0,
+        entries: entriesRes.count || 0,
         logs: logsRes.count || 0
       });
     } catch (error) {
@@ -130,7 +135,7 @@ export default function QA() {
   const handlePopulateDemoData = async () => {
     setIsPopulating(true);
     try {
-      const summary = await seedDemoData();
+      const summary = await seedFullDemo();
       await loadDemoDataCounts();
       
       const currentTime = new Date().toLocaleString();
@@ -138,8 +143,8 @@ export default function QA() {
       localStorage.setItem('qa:lastPopulateTime', currentTime);
       
       toast({
-        title: 'Demo Data Populated',
-        description: `Created: ${summary.clients} clients, ${summary.invoices} invoices, ${summary.tasks} tasks`,
+        title: 'Full Demo Data Populated',
+        description: `Created: ${summary.clients} clients, ${summary.projects} projects, ${summary.tasks} tasks, ${summary.invoices} invoices, ${summary.reminders} reminders, ${summary.goals} goals, ${summary.entries} entries`,
       });
     } catch (error) {
       toast({
@@ -155,9 +160,8 @@ export default function QA() {
   const handleResetDemo = async () => {
     setIsResetting(true);
     try {
-      const resetResult = await resetDemo();
+      const resetResult = await resetQaFixtures();
       if (resetResult.ok) {
-        const summary = await seedDemoData();
         await loadDemoDataCounts();
         
         const currentTime = new Date().toLocaleString();
@@ -165,8 +169,8 @@ export default function QA() {
         localStorage.setItem('qa:lastResetTime', currentTime);
         
         toast({
-          title: 'Demo Reset Complete',
-          description: `Cleared ${resetResult.tablesCleared.length} tables and re-seeded fresh data`,
+          title: 'Demo Data Reset Complete',
+          description: `Cleared ${resetResult.tablesCleared.length} tables. Run "Populate Full Demo Data" to re-seed.`,
         });
       } else {
         throw new Error(resetResult.error || 'Reset failed');
@@ -459,27 +463,49 @@ export default function QA() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-4 gap-4 text-center">
+          <div className="grid grid-cols-4 md:grid-cols-5 gap-4 text-center">
             <div>
               <div className="text-2xl font-bold">{demoDataCounts.clients || '—'}</div>
               <div className="text-sm text-muted-foreground">Clients</div>
             </div>
             <div>
-              <div className="text-2xl font-bold">{demoDataCounts.invoices || '—'}</div>
-              <div className="text-sm text-muted-foreground">Invoices</div>
+              <div className="text-2xl font-bold">{demoDataCounts.projects || '—'}</div>
+              <div className="text-sm text-muted-foreground">Projects</div>
             </div>
             <div>
               <div className="text-2xl font-bold">{demoDataCounts.tasks || '—'}</div>
               <div className="text-sm text-muted-foreground">Tasks</div>
             </div>
             <div>
+              <div className="text-2xl font-bold">{demoDataCounts.invoices || '—'}</div>
+              <div className="text-sm text-muted-foreground">Invoices</div>
+            </div>
+            <div>
               <div className="text-2xl font-bold">{demoDataCounts.reminders || '—'}</div>
               <div className="text-sm text-muted-foreground">Reminders</div>
             </div>
           </div>
+          <div className="grid grid-cols-4 gap-4 text-center mt-4">
+            <div>
+              <div className="text-2xl font-bold">{demoDataCounts.goals || '—'}</div>
+              <div className="text-sm text-muted-foreground">Goals</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold">{demoDataCounts.entries || '—'}</div>
+              <div className="text-sm text-muted-foreground">Entries</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold">{demoDataCounts.items || '—'}</div>
+              <div className="text-sm text-muted-foreground">Items</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold">{demoDataCounts.logs || '—'}</div>
+              <div className="text-sm text-muted-foreground">Logs</div>
+            </div>
+          </div>
           {(demoDataCounts.clients === 0 && demoDataCounts.invoices === 0 && demoDataCounts.tasks === 0) && (
             <div className="mt-4 text-sm text-muted-foreground text-center">
-              Demo data is optional; some tests may be skipped.
+              No demo data. Click "Populate Full Demo Data" to seed all tables.
             </div>
           )}
         </CardContent>
